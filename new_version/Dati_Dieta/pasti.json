@@ -1,0 +1,278 @@
+{
+    "pasta con pesto": [
+        [
+            "pasta",
+            1.3
+        ],
+        [
+            "pesto",
+            0.4
+        ]
+    ],
+    "pasta con tonno": [
+        [
+            "pasta",
+            1.42
+        ],
+        [
+            "olio",
+            0.16
+        ],
+        [
+            "tonno",
+            0.28
+        ],
+        [
+            "passata di pomodoro",
+            1.1
+        ]
+    ],
+    "cornetto e caff\u00e8": [
+        [
+            "cornetto",
+            1.0
+        ]
+    ],
+    "cornetto e succo d'arancia": [
+        [
+            "cornetto",
+            1.0
+        ],
+        [
+            "arance",
+            2.0
+        ]
+    ],
+    "pasta alla carlofortina": [
+        [
+            "pasta",
+            1.91
+        ],
+        [
+            "pesto",
+            0.55
+        ],
+        [
+            "tonno",
+            0.32
+        ],
+        [
+            "pomodorini",
+            0.67
+        ]
+    ],
+    "pollo alla cacciatora": [
+        [
+            "olio",
+            0.07
+        ],
+        [
+            "passata di pomodoro",
+            3.0
+        ],
+        [
+            "sedano",
+            0.4
+        ],
+        [
+            "carote",
+            0.4
+        ],
+        [
+            "cipolla",
+            0.4
+        ],
+        [
+            "pollo fusi",
+            3.27
+        ]
+    ],
+    "pasta aglio e olio": [
+        [
+            "olio",
+            0.25
+        ],
+        [
+            "pasta",
+            2.0
+        ]
+    ],
+    "panino con formaggio e salsiccia": [
+        [
+            "lucanica",
+            0.89
+        ],
+        [
+            "provola affumicata",
+            0.45
+        ],
+        [
+            "pane",
+            0.6
+        ]
+    ],
+    "piatto lenticchie": [
+        [
+            "lenticchie",
+            1.07
+        ],
+        [
+            "olio",
+            0.05
+        ],
+        [
+            "sedano",
+            0.1
+        ],
+        [
+            "carote",
+            0.1
+        ],
+        [
+            "cipolla",
+            0.1
+        ]
+    ],
+    "pasta amatriciana": [
+        [
+            "pasta",
+            1.81
+        ],
+        [
+            "guanciale",
+            0.35
+        ],
+        [
+            "formaggio pecorino",
+            0.26
+        ],
+        [
+            "passata di pomodoro",
+            1.8
+        ]
+    ],
+    "insalata di tonno": [
+        [
+            "tonno",
+            1.3
+        ],
+        [
+            "olio",
+            0.1
+        ],
+        [
+            "cipolla",
+            0.55
+        ],
+        [
+            "rucola",
+            0.22
+        ],
+        [
+            "pomodorini",
+            1.24
+        ],
+        [
+            "maionese",
+            0.2
+        ]
+    ],
+    "pane con salsiccia e salsa": [
+        [
+            "pane",
+            1.25
+        ],
+        [
+            "lucanica",
+            0.89
+        ],
+        [
+            "maionese",
+            0.14
+        ]
+    ],
+    "pollo al forno": [
+        [
+            "pollo fusi",
+            2.7
+        ],
+        [
+            "maionese",
+            0.15
+        ]
+    ],
+    "pasta al sugo": [
+        [
+            "pasta",
+            1.6
+        ],
+        [
+            "passata di pomodoro",
+            2.5
+        ],
+        [
+            "grana",
+            0.13
+        ],
+        [
+            "olio",
+            0.16
+        ]
+    ],
+    "pasta zucchine e bottarga": [
+        [
+            "pasta",
+            1.54
+        ],
+        [
+            "olio",
+            0.18
+        ],
+        [
+            "zucchine",
+            2.13
+        ],
+        [
+            "bottarga",
+            0.2
+        ]
+    ],
+    "petto di pollo in padella": [
+        [
+            "olio",
+            0.23
+        ],
+        [
+            "petto di pollo",
+            2.05
+        ],
+        [
+            "cipolla",
+            0.63
+        ],
+        [
+            "maionese",
+            0.07
+        ]
+    ],
+    "omelette": [
+        [
+            "burro",
+            0.16
+        ],
+        [
+            "uova",
+            0.92
+        ]
+    ],
+    "pasta cacio e pepe": [
+        [
+            "pasta",
+            1.53
+        ],
+        [
+            "formaggio pecorino",
+            0.56
+        ]
+    ]
+}

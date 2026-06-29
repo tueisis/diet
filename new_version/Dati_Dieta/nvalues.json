@@ -1,0 +1,145 @@
+{
+    "pasta": {
+        "kcal": 351.0,
+        "proteine": 13.0,
+        "carboidrati": 72.0,
+        "grassi": 1.5
+    },
+    "pesto": {
+        "kcal": 536.0,
+        "proteine": 5.0,
+        "carboidrati": 8.0,
+        "grassi": 52.0
+    },
+    "pane": {
+        "kcal": 262.0,
+        "proteine": 9.0
+    },
+    "burro": {
+        "kcal": 750.0
+    },
+    "acciughe": {
+        "kcal": 216.0
+    },
+    "cornetto": {
+        "kcal": 204.0,
+        "proteine": 3.1,
+        "carboidrati": 28.0,
+        "grassi": 8.5
+    },
+    "olio": {
+        "kcal": 884.0,
+        "proteine": 0.0,
+        "carboidrati": 0.0,
+        "grassi": 100.0
+    },
+    "passata di pomodoro": {
+        "kcal": 23.0,
+        "proteine": 1.2,
+        "carboidrati": 4.0,
+        "grassi": 0.2
+    },
+    "tonno": {
+        "kcal": 327.0,
+        "proteine": 25.0,
+        "carboidrati": 0.0,
+        "grassi": 25.0
+    },
+    "formaggio vezzena": {
+        "kcal": 392.0,
+        "proteine": 26.0
+    },
+    "arance": {
+        "kcal": 37.0,
+        "proteine": 0.0
+    },
+    "tagliata manzo": {
+        "kcal": 155.0,
+        "proteine": 21.0
+    },
+    "lenticchie": {
+        "kcal": 304.0,
+        "proteine": 25.0
+    },
+    "sedano": {
+        "kcal": 18.0
+    },
+    "carote": {
+        "kcal": 40.0
+    },
+    "cipolla": {
+        "kcal": 35.0
+    },
+    "guanciale": {
+        "kcal": 660.0,
+        "proteine": 6.4
+    },
+    "formaggio pecorino": {
+        "kcal": 380.0,
+        "proteine": 29.0
+    },
+    "cotolette garden gurmet": {
+        "kcal": 223.0
+    },
+    "maionese": {
+        "kcal": 649.0,
+        "proteine": 0.8
+    },
+    "alcol": {
+        "kcal": 700.0
+    },
+    "mela": {
+        "kcal": 53.0
+    },
+    "zucchine": {
+        "kcal": 15.0
+    },
+    "bottarga": {
+        "kcal": 387.0
+    },
+    "provola affumicata": {
+        "kcal": 288.0
+    },
+    "kcal": {
+        "kcal": 1.0
+    },
+    "grana": {
+        "kcal": 398.0,
+        "proteine": 33.0
+    },
+    "petto di pollo": {
+        "kcal": 110.0,
+        "proteine": 23.0
+    },
+    "uova": {
+        "kcal": 128.0,
+        "proteine": 13.0
+    },
+    "pomodorini": {
+        "kcal": 37.0
+    },
+    "noci": {
+        "kcal": 685.0
+    },
+    "yogurt": {
+        "kcal": 66.0,
+        "proteine": 3.8
+    },
+    "miele": {
+        "kcal": 304.0
+    },
+    "marmellata": {
+        "kcal": 160.0
+    },
+    "pollo fusi": {
+        "kcal": 125.0,
+        "proteine": 21.0
+    },
+    "lucanica": {
+        "kcal": 250.0,
+        "proteine": 16.0
+    },
+    "pinoli": {
+        "kcal": 625.0
+    }
+}
