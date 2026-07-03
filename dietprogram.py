@@ -13,7 +13,7 @@ class DietApp:
         #root deve essere un oggetto Tk()
         self.root = root
         self.root.title("Programma Dieta")
-        self.root.geometry("900x680")
+        self.root.geometry("960x720")
         
         # Applica tema scuro alla finestra principale
         self.root.configure(bg="#121214")
@@ -24,6 +24,8 @@ class DietApp:
         # Se la cartella non esiste, la crea automaticamente
         if not os.path.exists(self.data_folder):
             os.makedirs(self.data_folder)
+
+        self.meal_categories = ["Colazione", "Pranzo", "Cena", "Merenda"]
 
         # Percorsi file aggiornati dentro la sottocartella
         self.files = {
@@ -306,9 +308,9 @@ class DietApp:
 
         # Legge il piano per oggi
         plan_data = self.look_for(self.files['plan'], {})
-        today_plan = plan_data.get(self.today_str, {"Colazione": '-', "Pranzo": '-', "Cena": '-'})
+        today_plan = plan_data.get(self.today_str, {c: '-' for c in self.meal_categories})
         if today_plan is None:
-            today_plan = {"Colazione": '-', "Pranzo": '-', "Cena": '-'}
+            today_plan = {c: '-' for c in self.meal_categories}
 
         meals = [
             ("Colazione", self._format_meal_name(today_plan.get("Colazione", "-"))),
@@ -496,7 +498,7 @@ class DietApp:
             "in cui inserirai le calorie per ettogrammo.",
             bg="#1a1a1e"
         ).pack(anchor="w", pady=(0, 10))
-        self.food_listbox = self.create_listbox(col_destra, height=15)
+        self.food_listbox = self.create_listbox(col_destra, height=16)
         self.food_listbox.pack(fill="both", expand=True, pady=5)
         
         # Bottone cancella alimento selezionato oggi
@@ -520,19 +522,23 @@ class DietApp:
     def update_food_list(self):
         self.food_listbox.delete(0, tk.END)
         total_kcal = 0
+        total_protein = 0
 
         for food, qty in self.today_eaten:
             if food in self.nvalues:
                 kcal_per_hg = self.nvalues[food].get('kcal', 0)
+                prot_per_hg = self.nvalues[food].get('proteine', 0)
                 kcal_totali = kcal_per_hg * qty
+                prot_totali = prot_per_hg * qty
                 total_kcal += kcal_totali
-                self.food_listbox.insert(tk.END, f"{food} - {qty} hg (~{kcal_totali:.0f} kcal)")
+                total_protein += prot_totali
+                self.food_listbox.insert(tk.END, f"{food} - {qty} hg (~{kcal_totali:.0f} kcal, {prot_totali:.1f}g prot)")
             else:
                 self.open_new_food_window(food)
                 return
 
         self.food_listbox.insert(tk.END, "------------------------------------------")
-        self.food_listbox.insert(tk.END, f"TOTALE DI OGGI: {total_kcal:.1f} kcal")
+        self.food_listbox.insert(tk.END, f"TOTALE: {total_kcal:.0f} kcal  |  Proteine: {total_protein:.1f} g")
 
     def open_new_food_window(self, food_name):
         self.top = tk.Toplevel(self.root)
@@ -680,6 +686,19 @@ class DietApp:
 
         self.history_food_listbox.bind('<Double-Button-1>', add_from_history)
 
+        # Categoria pasto
+        self.create_label(col3, "Categoria pasto (opzionale):").pack(anchor="w", pady=(10, 2))
+        meal_category_var = tk.StringVar(value="")
+        cat_frame = tk.Frame(col3, bg="#1a1a1e")
+        cat_frame.pack(fill="x", pady=(0, 5))
+        for cat in [""] + self.meal_categories:
+            label = "Nessuna" if cat == "" else cat
+            rb = tk.Radiobutton(cat_frame, text=label, variable=meal_category_var, value=cat,
+                                bg="#1a1a1e", fg="white", selectcolor="#3b82f6",
+                                activebackground="#1a1a1e", activeforeground="white",
+                                relief="flat", bd=0, font=("Segoe UI", 9))
+            rb.pack(side="left", padx=(0, 8))
+
         def save_meal_template():
             nome_pasto = meal_name_entry.get().strip()
             if not nome_pasto:
@@ -690,7 +709,11 @@ class DietApp:
                 return
 
             templates = self.look_for(self.files['pasti'], {})
-            templates[nome_pasto] = self.elementi_pasto
+            category = meal_category_var.get()
+            if category:
+                templates[nome_pasto] = {"ingredients": self.elementi_pasto, "category": category}
+            else:
+                templates[nome_pasto] = self.elementi_pasto
             self.record(self.files['pasti'], templates)
             
             messagebox.showinfo("Successo", f"Pasto '{nome_pasto}' salvato correttamente!")
@@ -698,6 +721,7 @@ class DietApp:
             self.pasti_listbox.delete(0, tk.END)
             self.pasti_listbox.insert(tk.END, "Seleziona elementi con doppio click")
             self.elementi_pasto = []
+            meal_category_var.set("")
 
         btn_save = self.create_button(col3, "Salva come Pasto Rapido", command=save_meal_template, bg="#10b981")
         btn_save.pack(fill="x", pady=10)
@@ -779,6 +803,15 @@ class DietApp:
         
         self.db_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
+        # Legenda colori
+        legend_frame = tk.Frame(self.main_frame, bg="#121214")
+        legend_frame.pack(anchor="w", pady=(8, 2))
+        self.create_label(legend_frame, "Legenda colori:  ", font=("Segoe UI", 9, "bold"), fg="#6b7280", bg="#121214").pack(side="left")
+        self.create_label(legend_frame, "■", font=("Segoe UI", 9), fg="#f59e0b", bg="#121214").pack(side="left")
+        self.create_label(legend_frame, " prezzo mancante  ", font=("Segoe UI", 9), fg="#a0a0a5", bg="#121214").pack(side="left")
+        self.create_label(legend_frame, "■", font=("Segoe UI", 9), fg="#ef4444", bg="#121214").pack(side="left")
+        self.create_label(legend_frame, " prezzo e nutrienti vincolati mancanti", font=("Segoe UI", 9), fg="#a0a0a5", bg="#121214").pack(side="left")
 
         # Bottone Elimina sotto la tabella
         btn_delete = self.create_button(self.main_frame, "Elimina Alimento Selezionato", command=self.delete_food_from_db, bg="#ef4444")
@@ -957,8 +990,9 @@ class DietApp:
                 # Rinomina l'ingrediente nei pasti (pasti.json)
                 templates = self.look_for(self.files['pasti'], {})
                 updated_templates = False
-                for meal_name, ingredients in templates.items():
-                    for idx_ing, ing_pair in enumerate(ingredients):
+                for meal_name, meal_data in templates.items():
+                    ing_list = self._get_meal_ingredients(meal_data)
+                    for ing_pair in ing_list:
                         if ing_pair[0] == food_name:
                             ing_pair[0] = new_text
                             updated_templates = True
@@ -1006,12 +1040,22 @@ class DietApp:
             return val.get("nome", val.get("pasto", "-"))
         return val if val else "-"
 
+    def _get_meal_ingredients(self, meal_data):
+        if isinstance(meal_data, dict) and 'ingredients' in meal_data:
+            return meal_data['ingredients']
+        return meal_data if isinstance(meal_data, list) else []
+
+    def _get_meal_category(self, meal_data):
+        if isinstance(meal_data, dict) and 'category' in meal_data:
+            return meal_data['category']
+        return ''
+
     def calcola_valori_pasto(self, nome_pasto, templates):
         """Calcola i nutrienti totali di un singolo pasto rapido."""
         totali = {"kcal": 0.0, "proteine": 0.0, "carboidrati": 0.0, "grassi": 0.0}
         if nome_pasto == '-' or not nome_pasto:
             return totali
-        ingredienti = templates.get(nome_pasto, [])
+        ingredienti = self._get_meal_ingredients(templates.get(nome_pasto, []))
         for food, qty in ingredienti:
             if food in self.nvalues:
                 info = self.nvalues[food]
@@ -1026,7 +1070,7 @@ class DietApp:
         Ritorna None se qualsiasi ingrediente manca di prezzo (prezzo <= 0)."""
         if nome_pasto == '-' or not nome_pasto:
             return 0.0
-        ingredienti = templates.get(nome_pasto, [])
+        ingredienti = self._get_meal_ingredients(templates.get(nome_pasto, []))
         costo = 0.0
         for food, qty in ingredienti:
             p = self.prices.get(food, 0.0)
@@ -1065,16 +1109,35 @@ class DietApp:
         plan_data = self.look_for(self.files['plan'], {})
         constraints = self.look_for(self.files['constraints'], {})
 
+        # Escludi pasti già assegnati manualmente nei prossimi 5 giorni
+        assigned_meals = set()
+        for i in range(5):
+            date_obj = datetime.now() + timedelta(days=i)
+            d_key = date_obj.strftime("%Y-%m-%d")
+            day_plan = plan_data.get(d_key, {})
+            if day_plan:
+                for cat in self.meal_categories:
+                    meal = day_plan.get(cat, "-")
+                    if meal and meal != "-":
+                        assigned_meals.add(meal)
+        eligible_meals = [m for m in eligible_meals if m not in assigned_meals]
+
+        if not eligible_meals:
+            messagebox.showinfo("Piano completo", "Tutti i pasti sono già stati assegnati manualmente o nessun pasto è disponibile.")
+            return False
+
         # Trova gli slot vuoti nei prossimi 5 giorni
         days_slots = {}
         for i in range(5):
             date_obj = datetime.now() + timedelta(days=i)
             d_key = date_obj.strftime("%Y-%m-%d")
-            day_plan = plan_data.get(d_key, {"Colazione": "-", "Pranzo": "-", "Cena": "-"})
+            day_plan = plan_data.get(d_key, {c: "-" for c in self.meal_categories})
             if day_plan is None:
-                day_plan = {"Colazione": "-", "Pranzo": "-", "Cena": "-"}
+                day_plan = {c: "-" for c in self.meal_categories}
 
-            for cat in ["Colazione", "Pranzo", "Cena"]:
+            for cat in self.meal_categories:
+                if cat == "Merenda":
+                    continue
                 name = day_plan.get(cat, "-")
                 if not name or name == "-":
                     days_slots.setdefault(d_key, []).append(cat)
@@ -1126,6 +1189,16 @@ class DietApp:
         for nome in eligible_meals:
             model += lpSum(scelto[(s_idx, nome)] for s_idx in range(len(slots_to_fill))) <= 1
 
+        # VINCOLI DI CATEGORIA: Un pasto può essere assegnato solo a slot della sua categoria
+        for s_idx in range(len(slots_to_fill)):
+            d_key, cat = slots_to_fill[s_idx]
+            for nome in eligible_meals:
+                meal_data = templates.get(nome)
+                if meal_data is not None:
+                    meal_cat = self._get_meal_category(meal_data)
+                    if meal_cat and meal_cat != cat:
+                        model += scelto[(s_idx, nome)] == 0
+
         # VINCOLI NUTRIZIONALI GIORNALIERI (Versione sicura senza crash)
         for nutrient in ["kcal", "proteine", "carboidrati", "grassi"]:
             cfg = constraints.get(nutrient, {"min": None, "max": None})
@@ -1151,7 +1224,7 @@ class DietApp:
                 # 2. Somma dei nutrienti dei pasti già fissati manualmente in questo giorno
                 fixed_day = plan_data.get(d_key, {})
                 fixed_val = 0.0
-                for cat in ["Colazione", "Pranzo", "Cena"]:
+                for cat in self.meal_categories:
                     nome_fissato = fixed_day.get(cat, "-")
                     if nome_fissato and nome_fissato != "-":
                         # Calcola i valori nutrizionali reali del pasto fisso
@@ -1178,7 +1251,7 @@ class DietApp:
                 if value(scelto[(s_idx, nome)]) == 1:
 
                     if d_key not in plan_data:
-                        plan_data[d_key] = {"Colazione": "-", "Pranzo": "-", "Cena": "-"}
+                        plan_data[d_key] = {c: "-" for c in self.meal_categories}
 
                     # Salviamo solo la stringa con il nome pulito del pasto
                     plan_data[d_key][cat] = nome
@@ -1316,7 +1389,7 @@ class DietApp:
         colonne = ("Pasto", "Giorno1", "Giorno2", "Giorno3", "Giorno4", "Giorno5")
         
         # Grid Treeview
-        self.tree = ttk.Treeview(self.main_frame, columns=colonne, show='headings', height=5)
+        self.tree = ttk.Treeview(self.main_frame, columns=colonne, show='headings', height=6)
         self.tree.heading("Pasto", text="Orario")
         self.tree.column("Pasto", width=120, anchor="center")
         self.ingredients_label = tk.Label(self.main_frame, text='Click su un pasto programmato per visualizzare gli ingredienti', font=("Segoe UI", 9, "italic"), fg="#a0a0a5", bg="#1a1a1e")
@@ -1325,7 +1398,6 @@ class DietApp:
         date_keys = []
         plan_data = self.look_for(self.files['plan'], {})
         meals = self.look_for(self.files['pasti'], {})
-        new_plan = {}
 
         # Genera le intestazioni per i prossimi 5 giorni
         for i in range(5):
@@ -1337,12 +1409,11 @@ class DietApp:
 
             self.tree.heading(f"Giorno{i+1}", text=d_display)
             self.tree.column(f"Giorno{i+1}", width=150, anchor="center")
-            new_plan[d_key] = plan_data.get(d_key)
 
         self.tree.pack(fill="both", expand=True, pady=10)
 
         # Carica righe
-        for cat in ["Colazione", "Pranzo", "Cena"]:
+        for cat in self.meal_categories:
             valori = [cat]
             for d_key in date_keys:
                 pasti = plan_data.get(d_key)
@@ -1352,7 +1423,8 @@ class DietApp:
                     valori.append(self._format_meal_name(pasti.get(cat, '-')))
             self.tree.insert("", tk.END, values=valori)
 
-        # Gestione Doppio Click per inserire Pasto Rapido nel piano
+        swap_data = {"active": False, "source": None}
+
         def on_double_click(event):
             region = self.tree.identify_region(event.x, event.y)
             if region == "cell":
@@ -1370,36 +1442,64 @@ class DietApp:
 
         def on_click(event):
             region = self.tree.identify_region(event.x, event.y)
-            if region == "cell":
-                column = self.tree.identify_column(event.x)
-                row_id = self.tree.identify_row(event.y)
+            if region != "cell":
+                return
 
-                col_idx = int(column.replace('#', '')) - 2
-                if col_idx < 0:
-                    return
+            column = self.tree.identify_column(event.x)
+            row_id = self.tree.identify_row(event.y)
 
-                selected_date = date_keys[col_idx]
-                selected_cat = self.tree.item(row_id)['values'][0]
+            col_idx = int(column.replace('#', '')) - 2
+            if col_idx < 0:
+                return
 
-                raw_meal = plan_data.get(selected_date, {}).get(selected_cat, '-')
-                # Estrae il nome in modo sicuro se per caso fosse rimasto un vecchio dizionario
-                meal_name = raw_meal.get("nome", "-") if isinstance(raw_meal, dict) else raw_meal
+            selected_date = date_keys[col_idx]
+            selected_cat = self.tree.item(row_id)['values'][0]
 
-                if meal_name == '-':
-                    self.ingredients_label.config(text="Click su un pasto programmato per visualizzare gli ingredienti")
-                    return
-
-                if meal_name in meals:
-                    porzioni = self.look_for(self.files['porzioni'], {})
-                    porzione = porzioni.get(selected_date, {}).get(selected_cat, 1)
-                    str_ingredients = ''
-                    for i in meals[meal_name]:
-                        str_ingredients += f"{i[1]*porzione:.2f} hg di {i[0]}, "
-                    # Rimuove l'ultima virgola
-                    str_ingredients = str_ingredients.strip(", ")
-                    self.ingredients_label.config(text=f"{meal_name} fatto con: {str_ingredients}")
+            if swap_data["active"]:
+                if swap_data["source"] is None:
+                    swap_data["source"] = (selected_date, selected_cat)
+                    btn_swap.config(text="Seleziona secondo pasto...", bg="#f59e0b")
                 else:
-                    self.ingredients_label.config(text=f"{meal_name} (Nessun dettaglio ingredienti nel database)")
+                    src_date, src_cat = swap_data["source"]
+                    dst_date, dst_cat = selected_date, selected_cat
+                    if (src_date, src_cat) == (dst_date, dst_cat):
+                        swap_data["active"] = False
+                        swap_data["source"] = None
+                        btn_swap.config(text="Scambia Pasti", bg="#0e7490")
+                        return
+                    # Esegui lo scambio
+                    src_val = plan_data.get(src_date, {}).get(src_cat, '-')
+                    dst_val = plan_data.get(dst_date, {}).get(dst_cat, '-')
+                    if src_date not in plan_data:
+                        plan_data[src_date] = {c: "-" for c in self.meal_categories}
+                    if dst_date not in plan_data:
+                        plan_data[dst_date] = {c: "-" for c in self.meal_categories}
+                    plan_data[src_date][src_cat] = dst_val
+                    plan_data[dst_date][dst_cat] = src_val
+                    self.record(self.files['plan'], plan_data)
+                    swap_data["active"] = False
+                    swap_data["source"] = None
+                    btn_swap.config(text="Scambia Pasti", bg="#0e7490")
+                    self.show_planner_screen()
+                return
+
+            raw_meal = plan_data.get(selected_date, {}).get(selected_cat, '-')
+            meal_name = raw_meal.get("nome", "-") if isinstance(raw_meal, dict) else raw_meal
+
+            if meal_name == '-':
+                self.ingredients_label.config(text="Click su un pasto programmato per visualizzare gli ingredienti")
+                return
+
+            if meal_name in meals:
+                porzioni = self.look_for(self.files['porzioni'], {})
+                porzione = porzioni.get(selected_date, {}).get(selected_cat, 1)
+                str_ingredients = ''
+                for i in self._get_meal_ingredients(meals[meal_name]):
+                    str_ingredients += f"{i[1]*porzione:.2f} hg di {i[0]}, "
+                str_ingredients = str_ingredients.strip(", ")
+                self.ingredients_label.config(text=f"{meal_name} fatto con: {str_ingredients}")
+            else:
+                self.ingredients_label.config(text=f"{meal_name} (Nessun dettaglio ingredienti nel database)")
 
         self.tree.bind("<Double-Button-1>", on_double_click)
         self.tree.bind("<Button-1>", on_click)
@@ -1414,6 +1514,11 @@ class DietApp:
             if ok:
                 self.show_planner_screen()
 
+        def start_swap():
+            swap_data["active"] = True
+            swap_data["source"] = None
+            btn_swap.config(text="Seleziona primo pasto...", bg="#ef4444")
+
         btn_opt = self.create_button(
             btn_frame, "✨ Ottimizza Piano",
             command=run_ottimizza, bg="#7c3aed"
@@ -1424,7 +1529,13 @@ class DietApp:
             btn_frame, "⚙ Imposta Vincoli",
             command=self.show_constraints_dialog, bg="#0e7490"
         )
-        btn_cns.pack(side="left", padx=(0, 15))
+        btn_cns.pack(side="left", padx=(0, 10))
+
+        btn_swap = self.create_button(
+            btn_frame, "Scambia Pasti",
+            command=start_swap, bg="#0e7490"
+        )
+        btn_swap.pack(side="left", padx=(0, 15))
 
         self.create_label(
             btn_frame,
@@ -1507,7 +1618,7 @@ class DietApp:
             plan_data = self.look_for(self.files['plan'], {})
 
             if plan_data.get(target_date) is None:
-                plan_data[target_date] = {"Colazione": '-', "Pranzo": '-', "Cena": '-'}
+                plan_data[target_date] = {c: '-' for c in self.meal_categories}
 
             if nome_pasto == "[ Svuota Cella ]":
                 plan_data[target_date][category] = '-'

@@ -1,6 +1,11 @@
 In questo file verranno raccolte le prossime implementazioni.
 ---
-Per rendere più semplice l'utilizzo del programma si vogliono aggiungere dei label che consiglino come utilizzarla: per esempio nella scheda principale "Per iniziare registra giorno per giorno la massa corporea e le calorie ingerite", "Puoi pianificare i pasti nella scheda Piano Settimanale", "Puoi aiutati nel calcolare le calorie mangiate giorno per giorno con gli strumenti presenti nella scheda Diario Alimentare"; nella scheda del diario alimentare "Puoi compilare questa barra cliccando la lista degli alimenti salvati", "Se l'alimento non è nella lista cliccando su aggiungi pasto potrai aggiungerlo comunque: si aprirà una finestra in cui dovrai aggiungere le calorie contenute dall'alimento; cose di questo tipo anche per le altre schede.
+Aggiungere la possibilità di indicare con radiobutton se il pasto che si sta aggiungendo nella scheda dello storico pasti è specifico per una categoria di pasto specifica. Se selezionata una categoria si aggiunge il pasto a un nuovo dizionario che contiene il nome della categoria del pasto e i pasti che rientrano in quella categoria; l'ottimizzatore dovrà tenere conto del fatto che quel pasto possa o meno rientrare nella categoria prima di posizionarlo nel piano.
 ---
-Per aiutare l'utente ad aggiungere le informazioni nutrizionali e il prezzo degli alimenti si evidenziano nel database gli alimenti che più necessitano di informazioni; per esempio se un alimento è contenuto in un pasto veloce è importante che ci siano tutte le informazioni necessarie e si tenga presente che le informazioni necessarie per l'ottimizzatore sono sempre il prezzo e i valori nutrizionali che sono vincolate (sono vincolate quelle che sono presenti nel file constraints.json).
+Aggiungere la categoria di pasto merenda.
+---
+Aggiungere il totale di proteine ingerite nel diario alimentare.
+--- 
+Rivedere la geometria del programma la dimensione della finestra e dei widget,
+
 
