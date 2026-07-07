@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:520px">
+    <div class="card-title">Vincoli Nutrizionali Giornalieri</div>
+    <form method="POST" action="/constraints">
+        <table>
+            <thead>
+                <tr>
+                    <th>Attivo</th>
+                    <th class="text-left">Nutriente</th>
+                    <th>Min</th>
+                    <th>Max</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, label in [("kcal","Calorie (kcal)"), ("proteine","Proteine (g)"), ("carboidrati","Carboidrati (g)"), ("grassi","Grassi (g)")] %}
+                    {% set cfg = constraints.get(key, {}) %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="enabled_{{ key }}" {% if cfg.get('enabled') %}checked{% endif %}>
+                        </td>
+                        <td class="text-left">{{ label }}</td>
+                        <td><input type="text" name="min_{{ key }}" value="{{ cfg.get('min') or '' }}" style="width:70px"></td>
+                        <td><input type="text" name="max_{{ key }}" value="{{ cfg.get('max') or '' }}" style="width:70px"></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="hint mt-10 mb-10">
+            Lascia Min o Max vuoto per non imporre quel limite. I vincoli sono applicati per ogni giorno ottimizzato.
+        </div>
+        <button type="submit" class="btn btn-green w-full">Salva Vincoli</button>
+    </form>
+</div>
+{% endblock %}

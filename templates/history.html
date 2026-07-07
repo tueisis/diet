@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-title">Seleziona Data:</div>
+            <div class="food-list" style="max-height:300px">
+                {% for date_str in date_list %}
+                    <div class="food-item" onclick="selectDate('{{ date_str }}')">{{ date_str }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card">
+            <div class="card-title" id="historyTitle">Pasti Consumati:</div>
+            <div class="food-list" id="historyList" style="max-height:300px">
+                {% if date_list %}
+                    <div class="hint">Seleziona una data a sinistra</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card">
+            <div class="card-title">Crea Pasto Rapido</div>
+            <div class="hint">
+                Fai doppio click sui cibi al centro per aggiungerli,
+                poi dai un nome al pasto e salvalo come Pasto Rapido.
+            </div>
+
+            <div class="food-list" id="quickMealList" style="max-height:150px;margin-bottom:10px">
+                <div class="hint">Seleziona elementi con doppio click</div>
+            </div>
+
+            <form method="POST" action="/save_meal_template">
+                <div class="mb-10">
+                    <label class="label">Nome del Pasto Rapido:</label>
+                    <input type="text" name="nome_pasto" id="mealNameInput" required>
+                </div>
+                <input type="hidden" name="ingredienti" id="ingredientiInput" value="[]">
+
+                <div class="mb-10">
+                    <label class="label">Categoria pasto (opzionale):</label>
+                    <div class="radio-group">
+                        {% for cat in ["", "Colazione", "Pranzo", "Cena", "Merenda"] %}
+                            <label>
+                                <input type="radio" name="category" value="{{ cat }}"
+                                    onchange="document.getElementById('mealNameInput').focus()">
+                                {{ "Nessuna" if cat == "" else cat }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-green w-full">Salva come Pasto Rapido</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const allEaten = {{ data.all_eaten | tojson | safe }};
+let quickMealItems = [];
+let selectedDate = null;
+
+function selectDate(dateStr) {
+    selectedDate = dateStr;
+    document.getElementById('historyTitle').textContent = 'Consumati il ' + dateStr + ':';
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    const pasti = allEaten[dateStr] || [];
+    pasti.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'food-item';
+        div.textContent = item[0] + ' - ' + item[1] + ' hg';
+        div.ondblclick = function() { addToQuickMeal(item[0], item[1]); };
+        list.appendChild(div);
+    });
+}
+
+function addToQuickMeal(food, qty) {
+    const list = document.getElementById('quickMealList');
+    if (list.children.length === 1 && list.children[0].textContent === 'Seleziona elementi con doppio click') {
+        list.innerHTML = '';
+    }
+    const div = document.createElement('div');
+    div.className = 'food-item';
+    div.textContent = food + ' (' + qty + ' hg)';
+    list.appendChild(div);
+    quickMealItems.push([food, parseFloat(qty)]);
+    document.getElementById('ingredientiInput').value = JSON.stringify(quickMealItems);
+}
+
+document.querySelector('form[action="/save_meal_template"]').addEventListener('submit', function(e) {
+    if (!quickMealItems.length) {
+        e.preventDefault();
+        alert('Aggiungi almeno un ingrediente!');
+    }
+});
+</script>
+{% endblock %}

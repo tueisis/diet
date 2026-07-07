@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <form method="POST" action="/record_weight" class="flex items-center gap-10" style="margin-bottom:10px">
+        <label class="font-bold" style="min-width:140px">Registra Peso (kg):</label>
+        <input type="text" name="weight" placeholder="es. 75.5" style="width:120px" required>
+        <button type="submit" class="btn btn-green">Registra</button>
+    </form>
+    <form method="POST" action="/record_calories" class="flex items-center gap-10">
+        <label class="font-bold" style="min-width:140px">Registra Calorie (kcal):</label>
+        <input type="text" name="calories" placeholder="es. 2000" style="width:120px" required>
+        <button type="submit" class="btn btn-blue">Registra</button>
+    </form>
+</div>
+
+<div class="card hint">
+    Per iniziare registra giorno per giorno la massa corporea e le calorie ingerite.
+    Puoi pianificare i pasti nella scheda Piano Settimanale.
+    Puoi aiutarti nel calcolare le calorie mangiate giorno per giorno con gli strumenti presenti nella scheda Diario Alimentare.
+</div>
+
+<div class="row">
+    <div class="col">
+        {% if data.weights %}
+            <div class="plot-container">
+                <img src="/plot" alt="Grafico peso">
+            </div>
+        {% else %}
+            <div class="card hint text-center" style="padding:60px">
+                Nessun dato di peso registrato disponibile per il grafico.
+            </div>
+        {% endif %}
+    </div>
+    <div class="col">
+        <div class="card">
+            <div class="card-title">Pasti Pianificati Oggi</div>
+            {% for cat in ["Colazione", "Pranzo", "Cena", "Merenda"] %}
+                <div class="flex items-center gap-10" style="margin-bottom:8px">
+                    <span class="label-muted font-bold" style="min-width:80px">{{ cat }}:</span>
+                    <span>{{ today_plan.get(cat, '-') }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if stats.trend != 'Stazionario' or data.weights|length > 1 %}
+    <div class="card">
+        <div class="row text-center">
+            <div class="col">
+                <div class="font-bold {% if stats.trend == 'Dimagrimento' %}text-green{% else %}text-blue{% endif %}">
+                    Trend Rilevato<br>{{ stats.trend }}
+                </div>
+            </div>
+            <div class="col">
+                <div class="font-bold">
+                    Variazione Peso<br>{{ stats.slope }}
+                </div>
+            </div>
+            <div class="col">
+                <div class="font-bold">
+                    Calorie Medie (Introito)<br>{{ stats.mean_cal }}<br><br>
+                    Fabbisogno Giornaliero Stimato<br>{{ stats.fabisogno }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="hint text-center">
+            Fornisci almeno due record di peso per sbloccare le statistiche del trend.
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

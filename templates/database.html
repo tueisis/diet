@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <form method="POST" action="/add_food">
+        <div class="row items-center" style="flex-wrap:nowrap;gap:8px">
+            <input type="text" name="nome" placeholder="Nome" required style="width:150px">
+            <input type="text" name="kcal" placeholder="kcal/hg" style="width:80px">
+            <input type="text" name="proteine" placeholder="Pro/hg (g)" style="width:100px">
+            <input type="text" name="carboidrati" placeholder="Carb/hg (g)" style="width:100px">
+            <input type="text" name="grassi" placeholder="Grassi/hg (g)" style="width:100px">
+            <input type="text" name="prezzo" placeholder="Costo/hg (€)" style="width:100px">
+            <button type="submit" class="btn btn-green" style="white-space:nowrap">Aggiungi</button>
+        </div>
+    </form>
+</div>
+
+<div class="hint">
+    Compila tutti i campi per ogni alimento. Prezzo e valori nutrizionali sono essenziali
+    per l'ottimizzatore del piano settimanale.
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Alimento</th>
+            <th>kcal/hg</th>
+            <th>Proteine/hg (g)</th>
+            <th>Carboidrati/hg (g)</th>
+            <th>Grassi/hg (g)</th>
+            <th>Prezzo/hg (€)</th>
+            <th>Azioni</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% set ns = namespace(foods_in_meals={}) %}
+        {% for meal_name, meal_data in templates.items() %}
+            {% set ing_list = meal_data.ingredients if meal_data is mapping and meal_data.ingredients is defined else meal_data %}
+            {% if ing_list is iterable and ing_list is not string %}
+                {% for food, qty in ing_list %}
+                    {% set _ = ns.foods_in_meals.__setitem__(food, True) %}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+
+        {% for food_name in data.nvalues.keys() | sort %}
+            {% set val = data.nvalues[food_name] %}
+            {% set kcal = val.get('kcal', 0) %}
+            {% set prot = val.get('proteine', 0) %}
+            {% set carb = val.get('carboidrati', 0) %}
+            {% set grassi = val.get('grassi', 0) %}
+            {% set prezzo = data.prices.get(food_name, 0) %}
+
+            {% if food_name in ns.foods_in_meals %}
+                {% set missing_price = prezzo <= 0 %}
+                {% set constrained_nutrients = [] %}
+                {% for n in ['kcal','proteine','carboidrati','grassi'] %}
+                    {% set cfg = data.constraints.get(n, {}) %}
+                    {% if cfg.get('min') is not none or cfg.get('max') is not none %}
+                        {% if val.get(n, 0) <= 0 %}
+                            {% set _ = constrained_nutrients.append(n) %}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% set missing_nutrients = constrained_nutrients | length > 0 %}
+
+                {% if missing_price and missing_nutrients %}
+                    {% set row_class = 'needs-both' %}
+                {% elif missing_price %}
+                    {% set row_class = 'needs-price' %}
+                {% elif missing_nutrients %}
+                    {% set row_class = 'needs-nutrition' %}
+                {% else %}
+                    {% set row_class = '' %}
+                {% endif %}
+            {% else %}
+                {% set row_class = '' %}
+            {% endif %}
+
+            <tr class="{{ row_class }}">
+                <td class="clickable" onclick="editCell('{{ food_name }}', 'nome')">{{ food_name }}</td>
+                <td class="clickable" onclick="editCell('{{ food_name }}', 'kcal', {{ kcal }})">{{ '{:.1f}'.format(kcal) }}</td>
+                <td class="clickable" onclick="editCell('{{ food_name }}', 'proteine', {{ prot }})">{{ '{:.1f}'.format(prot) }}</td>
+                <td class="clickable" onclick="editCell('{{ food_name }}', 'carboidrati', {{ carb }})">{{ '{:.1f}'.format(carb) }}</td>
+                <td class="clickable" onclick="editCell('{{ food_name }}', 'grassi', {{ grassi }})">{{ '{:.1f}'.format(grassi) }}</td>
+                <td class="clickable" onclick="editCell('{{ food_name }}', 'prezzo', {{ prezzo }})">{{ '{:.2f}'.format(prezzo) }}</td>
+                <td>
+                    <form method="POST" action="/delete_food" style="display:inline" onsubmit="return confirm('Eliminare {{ food_name }}?')">
+                        <input type="hidden" name="nome" value="{{ food_name }}">
+                        <button type="submit" class="btn btn-red" style="padding:2px 8px;font-size:9pt">Elimina</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="legend flex items-center gap-10 mt-10">
+    <span>Legenda colori:</span>
+    <span class="needs-price">■</span><span> prezzo mancante</span>
+    <span class="needs-both">■</span><span> prezzo e nutrienti vincolati mancanti</span>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="width:320px;margin:auto;position:relative;top:30%">
+        <div class="card-title" id="editTitle">Modifica</div>
+        <form method="POST" action="/update_food">
+            <input type="hidden" name="old_name" id="editOldName">
+            <input type="hidden" name="field" id="editField">
+            <div class="mb-10"><input type="text" name="value" id="editValue" required></div>
+            <div class="flex gap-10">
+                <button type="submit" class="btn btn-blue w-full">Salva</button>
+                <button type="button" class="btn btn-red" onclick="closeEdit()">Annulla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editCell(foodName, field, currentVal) {
+    document.getElementById('editOldName').value = foodName;
+    document.getElementById('editField').value = field;
+    const input = document.getElementById('editValue');
+    input.value = currentVal !== undefined ? currentVal : foodName;
+    document.getElementById('editTitle').textContent = 'Modifica ' + (field === 'nome' ? 'nome' : field);
+    document.getElementById('editModal').style.display = 'flex';
+    input.focus();
+    input.select();
+}
+
+function closeEdit() {
+    document.getElementById('editModal').style.display = 'none';
+}
+</script>
+{% endblock %}

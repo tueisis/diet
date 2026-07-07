@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programma Dieta</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <a href="/" class="{% if active == 'main' %}active{% endif %}">Scheda principale</a>
+        <a href="/food" class="{% if active == 'food' %}active{% endif %}">Diario Alimentare</a>
+        <a href="/history" class="{% if active == 'history' %}active{% endif %}">Storico Pasti</a>
+        <a href="/planner" class="{% if active == 'planner' %}active{% endif %}">Piano Settimanale</a>
+        <a href="/database" class="{% if active == 'database' %}active{% endif %}">Database Alimenti</a>
+    </nav>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

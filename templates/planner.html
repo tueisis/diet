@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card-title">Piano Alimentare dei prossimi 5 giorni</div>
+
+<table class="treeview">
+    <thead>
+        <tr>
+            <th>Orario</th>
+            {% for dk in date_keys %}
+                <th>{{ dk.display }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for cat in meal_categories %}
+            <tr>
+                <td class="font-bold">{{ cat }}</td>
+                {% for dk in date_keys %}
+                    {% set d_key = dk.key %}
+                    {% set meal_name = plan_data.get(d_key, {}).get(cat, '-') if plan_data.get(d_key) else '-' %}
+                    <td class="clickable" onclick="openAssign('{{ d_key }}', '{{ cat }}')">
+                        {{ _format_meal_name(meal_name) if meal_name != '-' else '-' }}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="hint" id="ingredientsInfo">Click su un pasto programmato per visualizzare gli ingredienti</div>
+
+<div class="card">
+    <div class="flex items-center gap-10 flex-wrap">
+        <form method="POST" action="/ottimizza" style="display:inline">
+            <button type="submit" class="btn btn-purple">Ottimizza Piano</button>
+        </form>
+        <a href="/constraints" class="btn btn-teal">Imposta Vincoli</a>
+        <a href="#" class="btn btn-teal" onclick="startSwap()" id="swapBtn">Scambia Pasti</a>
+        <span class="hint">
+            Riempi i giorni vuoti minimizzando il costo e rispettando i vincoli nutrizionali.
+        </span>
+    </div>
+</div>
+
+<!-- Active constraints -->
+{% if active_parts %}
+    <div class="card flex items-center gap-10">
+        <span class="text-green font-bold">Vincoli attivi:</span>
+        <span class="label-muted">{{ active_parts | join(' &nbsp;|&nbsp; ') | safe }}</span>
+    </div>
+{% else %}
+    <div class="card">
+        <span class="hint">Nessun vincolo nutrizionale attivo — usa Imposta Vincoli per aggiungerne.</span>
+    </div>
+{% endif %}
+
+<!-- Assign Modal -->
+<div id="assignModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="width:380px;margin:auto;position:relative;top:25%">
+        <div class="card-title" id="assignTitle">Associa un Pasto Rapido</div>
+        <form method="POST" action="/assign_meal">
+            <input type="hidden" name="date" id="assignDate">
+            <input type="hidden" name="category" id="assignCategory">
+            <div class="food-list" style="max-height:200px;margin-bottom:10px">
+                <div class="food-item" onclick="selectMeal('[ Svuota Cella ]')">[ Svuota Cella ]</div>
+                {% for t in templates.keys() | sort %}
+                    <div class="food-item" onclick="selectMeal('{{ t }}')">{{ t }}</div>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="meal_name" id="selectedMeal">
+            <div class="flex gap-10">
+                <button type="submit" class="btn btn-green w-full">Conferma</button>
+                <button type="button" class="btn btn-red" onclick="closeAssign()">Annulla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Swap Modal -->
+<div id="swapModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="width:380px;margin:auto;position:relative;top:25%">
+        <div class="card-title">Scambia Pasti</div>
+        <form method="POST" action="/swap_meals">
+            <div class="mb-10">
+                <label class="label">Primo pasto (data/categoria):</label>
+                <input type="text" name="src_date" id="srcDate" placeholder="YYYY-MM-DD" required style="width:140px;display:inline-block">
+                <input type="text" name="src_cat" id="srcCat" placeholder="Categoria" required style="width:140px;display:inline-block">
+            </div>
+            <div class="mb-10">
+                <label class="label">Secondo pasto (data/categoria):</label>
+                <input type="text" name="dst_date" id="dstDate" placeholder="YYYY-MM-DD" required style="width:140px;display:inline-block">
+                <input type="text" name="dst_cat" id="dstCat" placeholder="Categoria" required style="width:140px;display:inline-block">
+            </div>
+            <div class="hint mb-10">Clicca su "Scambia Pasti" e poi su due celle della tabella</div>
+            <div class="flex gap-10">
+                <button type="submit" class="btn btn-green w-full">Conferma scambio</button>
+                <button type="button" class="btn btn-red" onclick="closeSwap()">Annulla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let swapMode = false;
+let swapStep = 0; // 0=inactive, 1=select first, 2=select second
+let swapSource = null;
+
+function openAssign(date, cat) {
+    if (swapMode) {
+        if (swapStep === 1) {
+            document.getElementById('srcDate').value = date;
+            document.getElementById('srcCat').value = cat;
+            swapStep = 2;
+            document.getElementById('swapBtn').textContent = 'Seleziona secondo pasto...';
+        } else if (swapStep === 2) {
+            document.getElementById('dstDate').value = date;
+            document.getElementById('dstCat').value = cat;
+            document.getElementById('swapBtn').textContent = 'Scambia Pasti';
+            swapMode = false;
+            swapStep = 0;
+            document.getElementById('swapModal').querySelector('form').submit();
+        }
+        return;
+    }
+    document.getElementById('assignDate').value = date;
+    document.getElementById('assignCategory').value = cat;
+    document.getElementById('assignTitle').textContent = 'Pianifica: ' + cat + ' (' + date + ')';
+    document.getElementById('assignModal').style.display = 'flex';
+}
+
+function selectMeal(name) {
+    document.getElementById('selectedMeal').value = name;
+    document.querySelector('#assignModal form').submit();
+}
+
+function closeAssign() {
+    document.getElementById('assignModal').style.display = 'none';
+}
+function closeSwap() {
+    document.getElementById('swapModal').style.display = 'none';
+    document.getElementById('swapBtn').textContent = 'Scambia Pasti';
+    swapMode = false;
+    swapStep = 0;
+}
+
+function startSwap() {
+    swapMode = true;
+    swapStep = 1;
+    swapSource = null;
+    document.getElementById('swapBtn').textContent = 'Seleziona primo pasto...';
+}
+
+// Ingredient display on click
+const planData = {{ plan_data | tojson | safe }};
+const templates = {{ templates | tojson | safe }};
+const porzioni = {{ porzioni | tojson | safe }};
+
+document.querySelectorAll('.treeview tbody td.clickable').forEach(td => {
+    td.addEventListener('click', function(e) {
+        if (swapMode) return;
+        const row = this.parentElement;
+        const cat = row.cells[0].textContent.trim();
+        const colIdx = Array.from(row.cells).indexOf(this);
+        if (colIdx < 1) return;
+        const dateKey = {{ date_keys | map(attribute='key') | list | tojson | safe }}[colIdx - 1];
+        const mealName = this.textContent.trim();
+        const info = document.getElementById('ingredientsInfo');
+
+        if (mealName === '-' || mealName === '') {
+            info.textContent = 'Click su un pasto programmato per visualizzare gli ingredienti';
+            return;
+        }
+
+        const mealData = templates[mealName];
+        if (!mealData) {
+            info.textContent = mealName + ' (Nessun dettaglio ingredienti nel database)';
+            return;
+        }
+
+        const ingredients = mealData.ingredients || mealData;
+        if (!Array.isArray(ingredients)) {
+            info.textContent = mealName + ' (Nessun dettaglio ingredienti nel database)';
+            return;
+        }
+
+        const porzione = (porzioni[dateKey] && porzioni[dateKey][cat]) || 1;
+        let str = mealName + ' fatto con: ';
+        str += ingredients.map(i => (i[1] * porzione).toFixed(2) + ' hg di ' + i[0]).join(', ');
+        info.textContent = str;
+    });
+});
+</script>
+{% endblock %}

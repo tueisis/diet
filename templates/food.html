@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-title">Aggiungi un alimento al diario di oggi</div>
+            <div class="hint">
+                Seleziona un alimento dalla lista qui sotto o digita il nome manualmente,
+                poi inserisci la quantità in ettogrammi (hg) e clicca Aggiungi al Diario.
+            </div>
+            <form method="POST" action="/add_food_item" class="mb-10">
+                <div class="mb-10">
+                    <label class="label">Alimento:</label>
+                    <input type="text" name="name" id="foodInput" placeholder="Cerca o digita nome..." required>
+                </div>
+                <div class="flex items-center gap-10 mb-10">
+                    <label class="label" style="min-width:100px">Quantità (hg):</label>
+                    <input type="text" name="qty" placeholder="es. 1.5" style="width:100px" required>
+                    <span class="hint" id="preview">Calorie previste: --</span>
+                </div>
+                <button type="submit" class="btn btn-blue w-full">Aggiungi al Diario</button>
+            </form>
+
+            <div class="font-bold mb-10">Alimenti salvati nel database:</div>
+            <div class="food-list" id="foodList">
+                {% for item in food_list %}
+                    <div class="food-item" onclick="selectFood('{{ item }}')">{{ item }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col">
+        <div class="card">
+            <div class="card-title">Diario Alimentare di Oggi</div>
+            <div class="hint">
+                Se l'alimento non è nella lista, aggiungilo comunque: si aprirà una finestra
+                in cui inserirai le calorie per ettogrammo.
+            </div>
+            <div class="food-list" style="max-height:350px">
+                {% set ns = namespace(total_kcal=0, total_prot=0) %}
+                {% for food, qty in data.today_eaten %}
+                    {% if food in data.nvalues %}
+                        {% set kcal = data.nvalues[food].get('kcal', 0) * qty %}
+                        {% set prot = data.nvalues[food].get('proteine', 0) * qty %}
+                        {% set ns.total_kcal = ns.total_kcal + kcal %}
+                        {% set ns.total_prot = ns.total_prot + prot %}
+                        <div class="food-item flex items-center" style="justify-content:space-between">
+                            <span>{{ food }} - {{ qty }} hg (~{{ '{:.0f}'.format(kcal) }} kcal, {{ '{:.1f}'.format(prot) }}g prot)</span>
+                            <form method="POST" action="/delete_food_item" style="display:inline">
+                                <input type="hidden" name="idx" value="{{ loop.index0 }}">
+                                <button type="submit" class="btn btn-red" style="padding:2px 8px;font-size:9pt">X</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div class="food-item" style="color:#f59e0b">
+                            {{ food }} - {{ qty }} hg (dati mancanti)
+                            <a href="#" onclick="showNewFoodWindow('{{ food }}')" style="color:#3b82f6;margin-left:8px">Aggiungi kcal</a>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <hr style="border-color:#252529;margin:8px 0">
+            <div class="font-bold">
+                TOTALE: {{ '{:.0f}'.format(ns.total_kcal) }} kcal  |  Proteine: {{ '{:.1f}'.format(ns.total_prot) }} g
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for new food nutrition -->
+<div id="newFoodModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="width:350px;margin:auto;position:relative;top:30%">
+        <div class="card-title">Inserisci le kcal per 1 hg</div>
+        <form method="POST" action="/new_food_nutrition">
+            <input type="hidden" name="food_name" id="modalFoodName">
+            <div class="mb-10"><input type="text" name="kcal" placeholder="kcal per hg" required></div>
+            <button type="submit" class="btn btn-green w-full">Salva e Calcola</button>
+        </form>
+    </div>
+</div>
+
+<script>
+const foodItems = document.querySelectorAll('#foodList .food-item');
+const foodInput = document.getElementById('foodInput');
+
+foodInput.addEventListener('keyup', function() {
+    const typed = this.value.toLowerCase();
+    foodItems.forEach(el => {
+        el.style.display = el.textContent.toLowerCase().includes(typed) ? 'block' : 'none';
+    });
+    updatePreview();
+});
+
+foodItems.forEach(el => {
+    el.addEventListener('click', function() {
+        foodInput.value = this.textContent.trim();
+        updatePreview();
+    });
+});
+
+function selectFood(name) {
+    foodInput.value = name;
+    updatePreview();
+}
+
+function updatePreview() {
+    const name = foodInput.value;
+    const nvalues = {{ data.nvalues | tojson | safe }};
+    if (name && nvalues[name] && nvalues[name].kcal) {
+        const qtyInput = document.querySelector('input[name="qty"]');
+        const qty = parseFloat(qtyInput.value) || 0;
+        const preview = document.getElementById('preview');
+        preview.textContent = `Calorie previste: ${(nvalues[name].kcal * qty).toFixed(1)} kcal`;
+        preview.style.color = '#10b981';
+    }
+}
+
+document.querySelector('input[name="qty"]').addEventListener('keyup', updatePreview);
+
+function showNewFoodWindow(name) {
+    document.getElementById('modalFoodName').value = name;
+    document.getElementById('newFoodModal').style.display = 'flex';
+}
+
+document.getElementById('newFoodModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+</script>
+{% endblock %}

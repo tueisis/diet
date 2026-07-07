@@ -9,11 +9,48 @@ import numpy as np
 from scipy import stats
 
 class DietApp:
+    # Centralized geometry and layout settings
+    LAYOUT_CFG = {
+        # Window & Dialog Dimensions
+        "MAIN_WINDOW_GEOMETRY": "960x720",
+        "CONSTRAINTS_DIALOG_GEOMETRY": "520x380",
+        "PLANNER_POPUP_GEOMETRY": "380x280",
+        "NEW_FOOD_DIALOG_GEOMETRY": "350x200",
+
+        # General Layout Margins & Padding
+        "MAIN_FRAME_PADX": 20,
+        "MAIN_FRAME_PADY_BOTTOM": 20,
+        
+        "NAV_BAR_PADY_TOP": 15,
+        "NAV_BAR_BUTTON_PADX": 18,
+        "NAV_BAR_BUTTON_PADY": 10,
+        "NAV_BAR_BUTTON_SPACE": 3,
+        "NAV_BAR_SEP_PADY_BOTTOM": 15,
+
+        # Matplotlib Plot Configurations
+        "PLOT_FIGSIZE": (5.0, 3.2),
+        "PLOT_DPI": 100,
+
+        # Listbox Heights
+        "LISTBOX_AUTOCOMPLETE_HEIGHT": 8,
+        "LISTBOX_DIARIO_LOG_HEIGHT": 16,
+        "LISTBOX_PLAN_TEMPLATE_HEIGHT": 6,
+        "LISTBOX_HIST_PASTI_HEIGHT": 8,
+
+        # Treeview Column Widths
+        "PLANNER_TIME_COL_WIDTH": 120,
+        "PLANNER_DAY_COL_WIDTH": 150,
+        
+        "DB_NAME_COL_WIDTH": 200,
+        "DB_VAL_COL_WIDTH": 100,
+        "DB_PRICE_COL_WIDTH": 120,
+    }
+
     def __init__(self, root):
         #root deve essere un oggetto Tk()
         self.root = root
         self.root.title("Programma Dieta")
-        self.root.geometry("960x720")
+        self.root.geometry(self.LAYOUT_CFG["MAIN_WINDOW_GEOMETRY"])
         
         # Applica tema scuro alla finestra principale
         self.root.configure(bg="#121214")
@@ -47,7 +84,11 @@ class DietApp:
 
         # Navigation Bar (persistente in alto)
         self.nav_frame = tk.Frame(self.root, bg="#121214")
-        self.nav_frame.pack(fill="x", side="top", padx=20, pady=(15, 0))
+        self.nav_frame.pack(
+            fill="x", side="top", 
+            padx=self.LAYOUT_CFG["MAIN_FRAME_PADX"], 
+            pady=(self.LAYOUT_CFG["NAV_BAR_PADY_TOP"], 0)
+        )
         
         self.tabs = {}
         schede = [
@@ -60,18 +101,28 @@ class DietApp:
             btn = tk.Button(
                 self.nav_frame, text=tab_name, command=command,
                 bg="#1a1a1e", fg="#a0a0a5", activebackground="#252529", activeforeground="white",
-                relief="flat", font=("Segoe UI", 10, "bold"), bd=0, padx=18, pady=10, cursor="hand2"
+                relief="flat", font=("Segoe UI", 10, "bold"), bd=0, 
+                padx=self.LAYOUT_CFG["NAV_BAR_BUTTON_PADX"], 
+                pady=self.LAYOUT_CFG["NAV_BAR_BUTTON_PADY"], cursor="hand2"
             )
-            btn.pack(side="left", padx=3)
+            btn.pack(side="left", padx=self.LAYOUT_CFG["NAV_BAR_BUTTON_SPACE"])
             self.tabs[tab_name] = btn
 
         # Separatore sottile sotto la nav bar
         sep = tk.Frame(self.root, height=1, bg="#252529")
-        sep.pack(fill="x", padx=20, pady=(5, 15))
+        sep.pack(
+            fill="x", 
+            padx=self.LAYOUT_CFG["MAIN_FRAME_PADX"], 
+            pady=(5, self.LAYOUT_CFG["NAV_BAR_SEP_PADY_BOTTOM"])
+        )
 
         # Container principale (per le varie schermate)
         self.main_frame = tk.Frame(self.root, bg="#121214")
-        self.main_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.main_frame.pack(
+            fill="both", expand=True, 
+            padx=self.LAYOUT_CFG["MAIN_FRAME_PADX"], 
+            pady=(0, self.LAYOUT_CFG["MAIN_FRAME_PADY_BOTTOM"])
+        )
 
         # Mostra la prima scheda
         self.show_main_screen()
@@ -252,7 +303,7 @@ class DietApp:
                               font=("Segoe UI", 11, "italic"), fg="#a0a0a5").grid(row=0, column=0, pady=60)
             return
 
-        fig, ax = plt.subplots(figsize=(5.0, 3.2), dpi=100, facecolor='#1a1a1e')
+        fig, ax = plt.subplots(figsize=self.LAYOUT_CFG["PLOT_FIGSIZE"], dpi=self.LAYOUT_CFG["PLOT_DPI"], facecolor='#1a1a1e')
         ax.set_facecolor('#1a1a1e')
 
         # Caricamento e ordinamento dei dati per data
@@ -431,7 +482,7 @@ class DietApp:
 
         # Autocompletamento Listbox degli alimenti salvati
         self.create_label(col_sinistra, "Alimenti salvati nel database:", font=("Segoe UI", 10, "bold"), bg="#121214").grid(row=4, column=0, columnspan=3, sticky="w", pady=(15, 5))
-        self.options = self.create_listbox(col_sinistra, height=8)
+        self.options = self.create_listbox(col_sinistra, height=self.LAYOUT_CFG["LISTBOX_AUTOCOMPLETE_HEIGHT"])
         self.options.grid(row=5, column=0, columnspan=3, sticky="nsew", pady=5)
 
         # Popola listbox alimenti salvati
@@ -498,7 +549,7 @@ class DietApp:
             "in cui inserirai le calorie per ettogrammo.",
             bg="#1a1a1e"
         ).pack(anchor="w", pady=(0, 10))
-        self.food_listbox = self.create_listbox(col_destra, height=16)
+        self.food_listbox = self.create_listbox(col_destra, height=self.LAYOUT_CFG["LISTBOX_DIARIO_LOG_HEIGHT"])
         self.food_listbox.pack(fill="both", expand=True, pady=5)
         
         # Bottone cancella alimento selezionato oggi
@@ -543,7 +594,7 @@ class DietApp:
     def open_new_food_window(self, food_name):
         self.top = tk.Toplevel(self.root)
         self.top.title(f"Dati mancanti: {food_name}")
-        self.top.geometry("350x200")
+        self.top.geometry(self.LAYOUT_CFG["NEW_FOOD_DIALOG_GEOMETRY"])
         self.top.configure(bg="#1a1a1e")
         self.top.wait_visibility()
         self.top.grab_set() # Modale
@@ -654,7 +705,7 @@ class DietApp:
             bg="#1a1a1e"
         ).pack(anchor="w", pady=(0, 10))
         
-        self.pasti_listbox = self.create_listbox(col3, width=30, height=8)
+        self.pasti_listbox = self.create_listbox(col3, width=30, height=self.LAYOUT_CFG["LISTBOX_HIST_PASTI_HEIGHT"])
         self.pasti_listbox.pack(fill="both", expand=True, pady=5)
         self.pasti_listbox.insert(tk.END, "Seleziona elementi con doppio click")
 
@@ -791,12 +842,12 @@ class DietApp:
         self.db_tree.heading("Grassi", text="Grassi/hg (g)")
         self.db_tree.heading("Prezzo", text="Prezzo/hg (€)")
 
-        self.db_tree.column("Alimento", width=200, anchor="w")
-        self.db_tree.column("kcal", width=100, anchor="center")
-        self.db_tree.column("Proteine", width=120, anchor="center")
-        self.db_tree.column("Carboidrati", width=120, anchor="center")
-        self.db_tree.column("Grassi", width=120, anchor="center")
-        self.db_tree.column("Prezzo", width=120, anchor="center")
+        self.db_tree.column("Alimento", width=self.LAYOUT_CFG["DB_NAME_COL_WIDTH"], anchor="w")
+        self.db_tree.column("kcal", width=self.LAYOUT_CFG["DB_VAL_COL_WIDTH"], anchor="center")
+        self.db_tree.column("Proteine", width=self.LAYOUT_CFG["DB_VAL_COL_WIDTH"], anchor="center")
+        self.db_tree.column("Carboidrati", width=self.LAYOUT_CFG["DB_VAL_COL_WIDTH"], anchor="center")
+        self.db_tree.column("Grassi", width=self.LAYOUT_CFG["DB_VAL_COL_WIDTH"], anchor="center")
+        self.db_tree.column("Prezzo", width=self.LAYOUT_CFG["DB_PRICE_COL_WIDTH"], anchor="center")
 
         scrollbar = ttk.Scrollbar(table_container, orient="vertical", command=self.db_tree.yview)
         self.db_tree.configure(yscrollcommand=scrollbar.set)
@@ -1275,7 +1326,7 @@ class DietApp:
 
         top = tk.Toplevel(self.root)
         top.title("Vincoli Nutrizionali Giornalieri")
-        top.geometry("520x380")
+        top.geometry(self.LAYOUT_CFG["CONSTRAINTS_DIALOG_GEOMETRY"])
         top.configure(bg="#1a1a1e")
         top.resizable(False, False)
         top.wait_visibility()
@@ -1391,7 +1442,7 @@ class DietApp:
         # Grid Treeview
         self.tree = ttk.Treeview(self.main_frame, columns=colonne, show='headings', height=6)
         self.tree.heading("Pasto", text="Orario")
-        self.tree.column("Pasto", width=120, anchor="center")
+        self.tree.column("Pasto", width=self.LAYOUT_CFG["PLANNER_TIME_COL_WIDTH"], anchor="center")
         self.ingredients_label = tk.Label(self.main_frame, text='Click su un pasto programmato per visualizzare gli ingredienti', font=("Segoe UI", 9, "italic"), fg="#a0a0a5", bg="#1a1a1e")
         self.ingredients_label.pack(expand=True, pady=5)
 
@@ -1408,7 +1459,7 @@ class DietApp:
             date_keys.append(d_key)
 
             self.tree.heading(f"Giorno{i+1}", text=d_display)
-            self.tree.column(f"Giorno{i+1}", width=150, anchor="center")
+            self.tree.column(f"Giorno{i+1}", width=self.LAYOUT_CFG["PLANNER_DAY_COL_WIDTH"], anchor="center")
 
         self.tree.pack(fill="both", expand=True, pady=10)
 
@@ -1585,7 +1636,7 @@ class DietApp:
     def show_template_popup(self, target_date, category):
         top = tk.Toplevel(self.root)
         top.title(f"Pianifica: {category} ({target_date})")
-        top.geometry("380x280")
+        top.geometry(self.LAYOUT_CFG["PLANNER_POPUP_GEOMETRY"])
         top.configure(bg="#1a1a1e")
         top.wait_visibility()
         top.grab_set()
@@ -1601,7 +1652,7 @@ class DietApp:
         self.create_label(top, f"Associa un Pasto Rapido a {category}:", font=("Segoe UI", 11, "bold")).pack(pady=(15, 5))
 
         templates = self.look_for(self.files['pasti'], {})
-        lb_tmpl = self.create_listbox(top, width=40, height=6)
+        lb_tmpl = self.create_listbox(top, width=40, height=self.LAYOUT_CFG["LISTBOX_PLAN_TEMPLATE_HEIGHT"])
         lb_tmpl.pack(padx=20, pady=5)
         
         # Aggiunge opzione svuota cella
