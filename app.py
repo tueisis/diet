@@ -1,4 +1,4 @@
-import os, json
+import os, json, uuid
 from datetime import datetime, timedelta
 from io import BytesIO
 from functools import lru_cache
@@ -13,7 +13,12 @@ from scipy import stats
 from pulp import LpProblem, LpVariable, LpMinimize, lpSum, value, PULP_CBC_CMD, LpStatusInfeasible, LpBinary, LpContinuous
 
 app = flask.Flask(__name__)
-app.secret_key = os.urandom(16)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(16).hex())
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_PERMANENT=False,
+)
 
 DATA_FOLDER = "Dati_Dieta"
 FILES = {
@@ -29,9 +34,77 @@ FILES = {
 }
 MEAL_CATEGORIES = ["Colazione", "Pranzo", "Cena", "Merenda"]
 
+# --- Database setup (PostgreSQL on Render, JSON files locally) ---
+DATABASE_URL = os.environ.get('DATABASE_URL')
+USE_DB = DATABASE_URL is not None
+
+if USE_DB:
+    import psycopg2
+    from psycopg2.extras import Json
+
+    def get_db():
+        return psycopg2.connect(DATABASE_URL)
+
+    def init_db():
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS user_data (
+                user_id TEXT PRIMARY KEY,
+                data JSONB NOT NULL DEFAULT '{}'::jsonb
+            )
+        ''')
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    def get_user_id():
+        if 'user_id' not in flask.session:
+            flask.session['user_id'] = uuid.uuid4().hex
+        return flask.session['user_id']
+
+    def load_user_data():
+        uid = get_user_id()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT data FROM user_data WHERE user_id = %s', (uid,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row:
+            return row[0]
+        return {}
+
+    def save_user_data(data):
+        uid = get_user_id()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO user_data (user_id, data) VALUES (%s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET data = %s
+        ''', (uid, Json(data), Json(data)))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    init_db()
+
+def _path_to_key(path):
+    """Convert a FILES path back to its key name, or return the path as-is."""
+    for k, v in FILES.items():
+        if v == path:
+            return k
+    return os.path.basename(path).replace('.json', '')
+
 def look_for(path, default=None):
     if default is None:
         default = {}
+
+    if USE_DB:
+        key = _path_to_key(path)
+        full = load_user_data()
+        return full.get(key, default)
+
     if os.path.exists(path):
         try:
             with open(path) as f:
@@ -41,6 +114,13 @@ def look_for(path, default=None):
     return default
 
 def record(path, data):
+    if USE_DB:
+        key = _path_to_key(path)
+        full = load_user_data()
+        full[key] = data
+        save_user_data(full)
+        return
+
     try:
         with open(path, 'w') as f:
             json.dump(data, f, indent=4)
@@ -663,4 +743,5 @@ def constraints_screen():
 app.jinja_env.globals.update(_format_meal_name=_format_meal_name)
 
 if __name__ == '__main__':
-    app.run(debug=False, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
