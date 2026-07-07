@@ -21,6 +21,7 @@ app.config.update(
 )
 
 DATA_FOLDER = "Dati_Dieta"
+os.makedirs(DATA_FOLDER, exist_ok=True)
 FILES = {
     'prices': os.path.join(DATA_FOLDER, 'food_prices.json'),
     'weights': os.path.join(DATA_FOLDER, 'wrecord.json'),
@@ -122,6 +123,7 @@ def record(path, data):
         return
 
     try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
             json.dump(data, f, indent=4)
     except Exception as e:
