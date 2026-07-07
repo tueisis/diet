@@ -35,6 +35,12 @@ FILES = {
 }
 MEAL_CATEGORIES = ["Colazione", "Pranzo", "Cena", "Merenda"]
 
+# --- User identification (always active, via session cookie) ---
+def get_user_id():
+    if 'user_id' not in flask.session:
+        flask.session['user_id'] = uuid.uuid4().hex
+    return flask.session['user_id']
+
 # --- Database setup (PostgreSQL on Render, JSON files locally) ---
 DATABASE_URL = os.environ.get('DATABASE_URL')
 USE_DB = DATABASE_URL is not None
@@ -58,11 +64,6 @@ if USE_DB:
         conn.commit()
         cur.close()
         conn.close()
-
-    def get_user_id():
-        if 'user_id' not in flask.session:
-            flask.session['user_id'] = uuid.uuid4().hex
-        return flask.session['user_id']
 
     def load_user_data():
         uid = get_user_id()
@@ -97,6 +98,13 @@ def _path_to_key(path):
             return k
     return os.path.basename(path).replace('.json', '')
 
+def _user_path(path):
+    """Prefix path with user-specific subfolder for local (non-DB) mode."""
+    uid = get_user_id()
+    base = os.path.dirname(path)
+    filename = os.path.basename(path)
+    return os.path.join(base, uid, filename)
+
 def look_for(path, default=None):
     if default is None:
         default = {}
@@ -106,9 +114,10 @@ def look_for(path, default=None):
         full = load_user_data()
         return full.get(key, default)
 
-    if os.path.exists(path):
+    upath = _user_path(path)
+    if os.path.exists(upath):
         try:
-            with open(path) as f:
+            with open(upath) as f:
                 return json.load(f)
         except Exception:
             return default
@@ -122,9 +131,10 @@ def record(path, data):
         save_user_data(full)
         return
 
+    upath = _user_path(path)
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
+        os.makedirs(os.path.dirname(upath), exist_ok=True)
+        with open(upath, 'w') as f:
             json.dump(data, f, indent=4)
     except Exception as e:
         flask.flash(f"Errore salvataggio: {e}", "error")
