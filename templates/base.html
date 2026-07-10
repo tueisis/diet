@@ -14,6 +14,43 @@
         <a href="/planner" class="{% if active == 'planner' %}active{% endif %}">Piano Settimanale</a>
         <a href="/database" class="{% if active == 'database' %}active{% endif %}">Database Alimenti</a>
     </nav>
+
+    <!-- Setup status banner -->
+    {% if code_is_set %}
+    <div class="setup-banner setup-ok">
+        <span class="setup-dot setup-dot-ok"></span>
+        <span>Codice personale attivo — i tuoi dati sono salvati sul server</span>
+        <form method="POST" action="/clear_code" style="margin:0">
+            <button type="submit" class="btn-link">Esci / Cambia codice</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="setup-banner setup-warn">
+        <div class="setup-warn-header">
+            <span class="setup-dot setup-dot-warn"></span>
+            <strong>Codice personale non impostato</strong>
+            <span class="setup-warn-sub">— i dati attuali sono temporanei e legati a questo browser</span>
+        </div>
+        <div class="setup-warn-body">
+            <span class="setup-instruction">
+                Scegli un codice segreto per salvare i tuoi dati in modo permanente e accedervi da qualsiasi dispositivo.
+                Se hai già un codice, inseriscilo per recuperare i tuoi dati.
+            </span>
+            <div class="setup-forms">
+                <form method="POST" action="/set_code" class="setup-form">
+                    <input type="text" name="access_code" placeholder="Nuovo codice (min. 4 car.)" autocomplete="off" style="width:220px">
+                    <button type="submit" class="btn btn-green">Imposta codice</button>
+                </form>
+                <span class="setup-or">oppure</span>
+                <form method="POST" action="/enter_code" class="setup-form">
+                    <input type="text" name="access_code" placeholder="Codice esistente" autocomplete="off" style="width:220px">
+                    <button type="submit" class="btn btn-blue">Accedi</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

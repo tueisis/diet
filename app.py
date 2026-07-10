@@ -1,4 +1,4 @@
-import os, json, uuid
+import os, json, uuid, hashlib
 from datetime import datetime, timedelta
 from io import BytesIO
 from functools import lru_cache
@@ -35,11 +35,27 @@ FILES = {
 }
 MEAL_CATEGORIES = ["Colazione", "Pranzo", "Cena", "Merenda"]
 
-# --- User identification (always active, via session cookie) ---
+# --- User identification ---
+# If the user has set a personal access code, the user_id is the SHA-256
+# hash of that code (so the raw code is never stored).  Otherwise we fall
+# back to a random temporary UUID so the rest of the app still works.
+
+def _hash_code(code: str) -> str:
+    """Return a stable hex digest for a given access code."""
+    return hashlib.sha256(code.strip().lower().encode()).hexdigest()
+
 def get_user_id():
     if 'user_id' not in flask.session:
         flask.session['user_id'] = uuid.uuid4().hex
     return flask.session['user_id']
+
+def is_code_set() -> bool:
+    """True when the session contains a user_id derived from an access code."""
+    return bool(flask.session.get('code_set', False))
+
+@app.context_processor
+def inject_setup_status():
+    return {'code_is_set': is_code_set()}
 
 # --- Database setup (PostgreSQL on Render, JSON files locally) ---
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -114,10 +130,10 @@ def look_for(path, default=None):
         full = load_user_data()
         return full.get(key, default)
 
-    upath = _user_path(path)
-    if os.path.exists(upath):
+    # Local mode: use the path directly (Dati_Dieta/filename)
+    if os.path.exists(path):
         try:
-            with open(upath) as f:
+            with open(path) as f:
                 return json.load(f)
         except Exception:
             return default
@@ -131,10 +147,10 @@ def record(path, data):
         save_user_data(full)
         return
 
-    upath = _user_path(path)
+    # Local mode: write directly to Dati_Dieta/filename
     try:
-        os.makedirs(os.path.dirname(upath), exist_ok=True)
-        with open(upath, 'w') as f:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
             json.dump(data, f, indent=4)
     except Exception as e:
         flask.flash(f"Errore salvataggio: {e}", "error")
@@ -753,6 +769,38 @@ def constraints_screen():
     return flask.render_template('constraints.html', constraints=constraints)
 
 app.jinja_env.globals.update(_format_meal_name=_format_meal_name)
+
+# --- Personal Access Code routes ---
+
+@app.route('/set_code', methods=['POST'])
+def set_code():
+    code = flask.request.form.get('access_code', '').strip()
+    if len(code) < 4:
+        flask.flash("Il codice deve essere di almeno 4 caratteri!", "error")
+        return flask.redirect(flask.request.referrer or '/')
+    hashed = _hash_code(code)
+    flask.session['user_id'] = hashed
+    flask.session['code_set'] = True
+    flask.flash("Codice personale impostato! I tuoi dati sono ora collegati a questo codice.", "success")
+    return flask.redirect('/')
+
+@app.route('/enter_code', methods=['POST'])
+def enter_code():
+    code = flask.request.form.get('access_code', '').strip()
+    if not code:
+        flask.flash("Inserisci il codice di accesso!", "error")
+        return flask.redirect(flask.request.referrer or '/')
+    hashed = _hash_code(code)
+    flask.session['user_id'] = hashed
+    flask.session['code_set'] = True
+    flask.flash("Accesso effettuato! I tuoi dati sono stati ripristinati.", "success")
+    return flask.redirect('/')
+
+@app.route('/clear_code', methods=['POST'])
+def clear_code():
+    flask.session.clear()
+    flask.flash("Sessione terminata. Inserisci il tuo codice per rientrare.", "info")
+    return flask.redirect('/')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
