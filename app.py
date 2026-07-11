@@ -1,4 +1,4 @@
-import os, json
+import os, json, uuid
 from datetime import datetime, timedelta
 from io import BytesIO
 from functools import lru_cache
@@ -17,13 +17,13 @@ app.secret_key = os.environ.get('SECRET_KEY', os.urandom(16).hex())
 
 MEAL_CATEGORIES = ["Colazione", "Pranzo", "Cena", "Merenda"]
 
-# --- Virtual file mapping (all data is in-memory only) ---
+# --- Per-session in-memory data store ---
 FILES = {
     'prices': 'prices', 'weights': 'weights', 'nvalues': 'nvalues',
     'eaten': 'eaten', 'calories': 'calories', 'pasti': 'pasti',
     'plan': 'plan', 'constraints': 'constraints', 'porzioni': 'porzioni',
 }
-_mem_data = {}
+_sessions = {}
 
 FILENAME_TO_KEY = {
     'wrecord.json': 'weights', 'calories.json': 'calories',
@@ -41,19 +41,30 @@ def _path_to_key(path):
     name = os.path.basename(path).replace('.json', '')
     return FILENAME_TO_KEY.get(name, name)
 
+def _sid():
+    if 'sid' not in flask.session:
+        flask.session['sid'] = uuid.uuid4().hex
+    return flask.session['sid']
+
+def _user_data():
+    sid = _sid()
+    if sid not in _sessions:
+        _sessions[sid] = {}
+    return _sessions[sid]
+
 def look_for(path, default=None):
     if default is None:
         default = {}
     key = _path_to_key(path) if isinstance(path, str) and '/' in path else path
-    return _mem_data.get(key, default)
+    return _user_data().get(key, default)
 
 def record(path, data):
     key = _path_to_key(path) if isinstance(path, str) and '/' in path else path
-    _mem_data[key] = data
+    _user_data()[key] = data
 
 @app.context_processor
 def inject_globals():
-    return {'has_data': bool(_mem_data)}
+    return {'has_data': bool(_user_data())}
 
 def load_data():
     data = {}
@@ -693,7 +704,7 @@ UPLOAD_HTML = '''<div style="text-align:center;padding:2rem 0">
 def upload_data():
     action = flask.request.form.get('action', '')
     if action == 'clear':
-        _mem_data.clear()
+        _user_data().clear()
         flask.flash("Dati rimossi dalla memoria.", "info")
         return flask.redirect('/')
 
@@ -712,7 +723,7 @@ def upload_data():
                         basename = os.path.basename(name)
                         if basename in FILENAME_TO_KEY:
                             key = FILENAME_TO_KEY[basename]
-                            _mem_data[key] = json.load(zf.open(name))
+                            _user_data()[key] = json.load(zf.open(name))
                             loaded += 1
             except zipfile.BadZipFile:
                 flask.flash(f"File {f.filename} non è uno zip valido.", "error")
@@ -721,7 +732,7 @@ def upload_data():
             if basename in FILENAME_TO_KEY:
                 key = FILENAME_TO_KEY[basename]
                 try:
-                    _mem_data[key] = json.load(f)
+                    _user_data()[key] = json.load(f)
                     loaded += 1
                 except json.JSONDecodeError:
                     flask.flash(f"File {f.filename} non è un JSON valido.", "error")
@@ -738,11 +749,12 @@ def upload_data():
 def download_data():
     import zipfile
     buf = BytesIO()
+    user_data = _user_data()
     count = 0
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for key, filename in KEY_TO_FILENAME.items():
-            if key in _mem_data:
-                zf.writestr(filename, json.dumps(_mem_data[key], indent=4, ensure_ascii=False))
+            if key in user_data:
+                zf.writestr(filename, json.dumps(user_data[key], indent=4, ensure_ascii=False))
                 count += 1
     buf.seek(0)
     if count == 0:
