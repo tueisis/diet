@@ -13,43 +13,43 @@
         <a href="/history" class="{% if active == 'history' %}active{% endif %}">Storico Pasti</a>
         <a href="/planner" class="{% if active == 'planner' %}active{% endif %}">Piano Settimanale</a>
         <a href="/database" class="{% if active == 'database' %}active{% endif %}">Database Alimenti</a>
+        <span class="nav-right">
+            <a href="/download" class="btn-nav">&#8681; Scarica</a>
+        </span>
     </nav>
 
-    <!-- Setup status banner -->
-    {% if code_is_set %}
-    <div class="setup-banner setup-ok">
-        <span class="setup-dot setup-dot-ok"></span>
-        <span>Codice personale attivo — i tuoi dati sono salvati sul server</span>
-        <form method="POST" action="/clear_code" style="margin:0">
-            <button type="submit" class="btn-link">Esci / Cambia codice</button>
-        </form>
-    </div>
-    {% else %}
-    <div class="setup-banner setup-warn">
+    <!-- Data upload banner (shown when no data or always as a persistent reminder) -->
+    <div class="setup-banner {% if has_data %}setup-ok{% else %}setup-warn{% endif %}">
         <div class="setup-warn-header">
-            <span class="setup-dot setup-dot-warn"></span>
-            <strong>Codice personale non impostato</strong>
-            <span class="setup-warn-sub">— i dati attuali sono temporanei e legati a questo browser</span>
+            <span class="setup-dot {% if has_data %}setup-dot-ok{% else %}setup-dot-warn{% endif %}"></span>
+            <strong>{% if has_data %}Dati caricati in memoria{% else %}Nessun dato caricato{% endif %}</strong>
+            <span class="setup-warn-sub">
+                {% if has_data %}
+                    &mdash; i dati sono temporanei. Scaricali alla fine della sessione.
+                {% else %}
+                    &mdash; carica la tua cartella Dati_Dieta per iniziare.
+                {% endif %}
+            </span>
         </div>
         <div class="setup-warn-body">
-            <span class="setup-instruction">
-                Scegli un codice segreto per salvare i tuoi dati in modo permanente e accedervi da qualsiasi dispositivo.
-                Se hai già un codice, inseriscilo per recuperare i tuoi dati.
-            </span>
-            <div class="setup-forms">
-                <form method="POST" action="/set_code" class="setup-form">
-                    <input type="text" name="access_code" placeholder="Nuovo codice (min. 4 car.)" autocomplete="off" style="width:220px">
-                    <button type="submit" class="btn btn-green">Imposta codice</button>
-                </form>
-                <span class="setup-or">oppure</span>
-                <form method="POST" action="/enter_code" class="setup-form">
-                    <input type="text" name="access_code" placeholder="Codice esistente" autocomplete="off" style="width:220px">
-                    <button type="submit" class="btn btn-blue">Accedi</button>
+            <div class="setup-instruction" style="margin-bottom:8px;font-size:.85rem">
+                <strong>Come funziona:</strong> Questa app non salva dati sul server.
+                Carica qui la tua cartella <code>Dati_Dieta</code> (come <code>.zip</code> o come file <code>.json</code>
+                singoli) all'inizio, modifica i dati, e alla fine <strong>scarica</strong> il
+                <code>.zip</code> aggiornato dal menu in alto. I dati restano solo nella
+                memoria del server finché la sessione è attiva.
+            </div>
+            <div class="setup-forms" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
+                <form method="POST" action="/upload" enctype="multipart/form-data" class="setup-form" style="gap:6px">
+                    <input type="file" name="data_file" accept=".zip,.json" multiple style="max-width:240px;font-size:.8rem">
+                    <button type="submit" class="btn btn-green" style="padding:4px 14px;font-size:.85rem">Carica</button>
+                    <button type="submit" name="action" value="clear" class="btn btn-red"
+                            style="padding:4px 14px;font-size:.85rem"
+                            onclick="return confirm('Cancellare tutti i dati dalla memoria?')">Cancella</button>
                 </form>
             </div>
         </div>
     </div>
-    {% endif %}
 
     <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}

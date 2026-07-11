@@ -56,22 +56,21 @@
 
 <!-- Assign Modal -->
 <div id="assignModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
-    <div class="card" style="width:380px;margin:auto;position:relative;top:25%">
+    <div class="card" style="width:400px;margin:auto;">
         <div class="card-title" id="assignTitle">Associa un Pasto Rapido</div>
-        <form method="POST" action="/assign_meal">
+        <form id="assignForm" method="POST" action="/assign_meal">
             <input type="hidden" name="date" id="assignDate">
             <input type="hidden" name="category" id="assignCategory">
-            <div class="food-list" style="max-height:200px;margin-bottom:10px">
-                <div class="food-item" onclick="selectMeal('[ Svuota Cella ]')">[ Svuota Cella ]</div>
+            <div class="food-list" style="max-height:260px;margin-bottom:10px">
+                <button type="submit" name="meal_name" value="[ Svuota Cella ]" class="food-item-btn">[ Svuota Cella ]</button>
                 {% for t in templates.keys() | sort %}
-                    <div class="food-item" onclick="selectMeal('{{ t }}')">{{ t }}</div>
+                    <button type="submit" name="meal_name" value="{{ t }}" class="food-item-btn">{{ t }}</button>
                 {% endfor %}
+                {% if not templates %}
+                    <div class="hint" style="padding:10px">Nessun pasto rapido salvato. Aggiungine uno dalla scheda <strong>Storico Pasti</strong>.</div>
+                {% endif %}
             </div>
-            <input type="hidden" name="meal_name" id="selectedMeal">
-            <div class="flex gap-10">
-                <button type="submit" class="btn btn-green w-full">Conferma</button>
-                <button type="button" class="btn btn-red" onclick="closeAssign()">Annulla</button>
-            </div>
+            <button type="button" class="btn btn-red w-full" onclick="closeAssign()">Annulla</button>
         </form>
     </div>
 </div>

@@ -1,4 +1,4 @@
-import os, json, uuid, hashlib
+import os, json
 from datetime import datetime, timedelta
 from io import BytesIO
 from functools import lru_cache
@@ -14,146 +14,46 @@ from pulp import LpProblem, LpVariable, LpMinimize, lpSum, value, PULP_CBC_CMD, 
 
 app = flask.Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(16).hex())
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_PERMANENT=False,
-)
 
-DATA_FOLDER = "Dati_Dieta"
-os.makedirs(DATA_FOLDER, exist_ok=True)
-FILES = {
-    'prices': os.path.join(DATA_FOLDER, 'food_prices.json'),
-    'weights': os.path.join(DATA_FOLDER, 'wrecord.json'),
-    'nvalues': os.path.join(DATA_FOLDER, 'nvalues.json'),
-    'eaten': os.path.join(DATA_FOLDER, 'eaten_lists.json'),
-    'calories': os.path.join(DATA_FOLDER, 'calories.json'),
-    'pasti': os.path.join(DATA_FOLDER, 'pasti.json'),
-    'plan': os.path.join(DATA_FOLDER, 'planner.json'),
-    'constraints': os.path.join(DATA_FOLDER, 'constraints.json'),
-    'porzioni': os.path.join(DATA_FOLDER, 'porzioni_piano.json'),
-}
 MEAL_CATEGORIES = ["Colazione", "Pranzo", "Cena", "Merenda"]
 
-# --- User identification ---
-# If the user has set a personal access code, the user_id is the SHA-256
-# hash of that code (so the raw code is never stored).  Otherwise we fall
-# back to a random temporary UUID so the rest of the app still works.
+# --- Virtual file mapping (all data is in-memory only) ---
+FILES = {
+    'prices': 'prices', 'weights': 'weights', 'nvalues': 'nvalues',
+    'eaten': 'eaten', 'calories': 'calories', 'pasti': 'pasti',
+    'plan': 'plan', 'constraints': 'constraints', 'porzioni': 'porzioni',
+}
+_mem_data = {}
 
-def _hash_code(code: str) -> str:
-    """Return a stable hex digest for a given access code."""
-    return hashlib.sha256(code.strip().lower().encode()).hexdigest()
-
-def get_user_id():
-    if 'user_id' not in flask.session:
-        flask.session['user_id'] = uuid.uuid4().hex
-    return flask.session['user_id']
-
-def is_code_set() -> bool:
-    """True when the session contains a user_id derived from an access code."""
-    return bool(flask.session.get('code_set', False))
-
-@app.context_processor
-def inject_setup_status():
-    return {'code_is_set': is_code_set()}
-
-# --- Database setup (PostgreSQL on Render, JSON files locally) ---
-DATABASE_URL = os.environ.get('DATABASE_URL')
-USE_DB = DATABASE_URL is not None
-
-if USE_DB:
-    import psycopg2
-    from psycopg2.extras import Json
-
-    def get_db():
-        return psycopg2.connect(DATABASE_URL)
-
-    def init_db():
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS user_data (
-                user_id TEXT PRIMARY KEY,
-                data JSONB NOT NULL DEFAULT '{}'::jsonb
-            )
-        ''')
-        conn.commit()
-        cur.close()
-        conn.close()
-
-    def load_user_data():
-        uid = get_user_id()
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute('SELECT data FROM user_data WHERE user_id = %s', (uid,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        if row:
-            return row[0]
-        return {}
-
-    def save_user_data(data):
-        uid = get_user_id()
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute('''
-            INSERT INTO user_data (user_id, data) VALUES (%s, %s)
-            ON CONFLICT (user_id) DO UPDATE SET data = %s
-        ''', (uid, Json(data), Json(data)))
-        conn.commit()
-        cur.close()
-        conn.close()
-
-    init_db()
+FILENAME_TO_KEY = {
+    'wrecord.json': 'weights', 'calories.json': 'calories',
+    'food_prices.json': 'prices', 'nvalues.json': 'nvalues',
+    'eaten_lists.json': 'eaten', 'pasti.json': 'pasti',
+    'planner.json': 'plan', 'constraints.json': 'constraints',
+    'porzioni_piano.json': 'porzioni',
+}
+KEY_TO_FILENAME = {v: k for k, v in FILENAME_TO_KEY.items()}
 
 def _path_to_key(path):
-    """Convert a FILES path back to its key name, or return the path as-is."""
-    for k, v in FILES.items():
-        if v == path:
-            return k
-    return os.path.basename(path).replace('.json', '')
-
-def _user_path(path):
-    """Prefix path with user-specific subfolder for local (non-DB) mode."""
-    uid = get_user_id()
-    base = os.path.dirname(path)
-    filename = os.path.basename(path)
-    return os.path.join(base, uid, filename)
+    for k, v in FILENAME_TO_KEY.items():
+        if k in path:
+            return v
+    name = os.path.basename(path).replace('.json', '')
+    return FILENAME_TO_KEY.get(name, name)
 
 def look_for(path, default=None):
     if default is None:
         default = {}
-
-    if USE_DB:
-        key = _path_to_key(path)
-        full = load_user_data()
-        return full.get(key, default)
-
-    # Local mode: use the path directly (Dati_Dieta/filename)
-    if os.path.exists(path):
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except Exception:
-            return default
-    return default
+    key = _path_to_key(path) if isinstance(path, str) and '/' in path else path
+    return _mem_data.get(key, default)
 
 def record(path, data):
-    if USE_DB:
-        key = _path_to_key(path)
-        full = load_user_data()
-        full[key] = data
-        save_user_data(full)
-        return
+    key = _path_to_key(path) if isinstance(path, str) and '/' in path else path
+    _mem_data[key] = data
 
-    # Local mode: write directly to Dati_Dieta/filename
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
-            json.dump(data, f, indent=4)
-    except Exception as e:
-        flask.flash(f"Errore salvataggio: {e}", "error")
+@app.context_processor
+def inject_globals():
+    return {'has_data': bool(_mem_data)}
 
 def load_data():
     data = {}
@@ -437,7 +337,7 @@ def planner_screen():
         parts = []
         if lo is not None: parts.append(f"\u2265{lo:.0f}")
         if hi is not None: parts.append(f"\u2264{hi:.0f}")
-        if parts: active_parts.append(f"{lbl}: {', '.join(parts)}")
+        active_parts.append(f"{lbl}: {', '.join(parts) if parts else 'attivo'}")
 
     return flask.render_template('planner.html', active='planner', data=data,
                                  plan_data=plan_data, templates=templates,
@@ -770,37 +670,90 @@ def constraints_screen():
 
 app.jinja_env.globals.update(_format_meal_name=_format_meal_name)
 
-# --- Personal Access Code routes ---
+# --- Upload / Download / Clear (client-side data only) ---
 
-@app.route('/set_code', methods=['POST'])
-def set_code():
-    code = flask.request.form.get('access_code', '').strip()
-    if len(code) < 4:
-        flask.flash("Il codice deve essere di almeno 4 caratteri!", "error")
-        return flask.redirect(flask.request.referrer or '/')
-    hashed = _hash_code(code)
-    flask.session['user_id'] = hashed
-    flask.session['code_set'] = True
-    flask.flash("Codice personale impostato! I tuoi dati sono ora collegati a questo codice.", "success")
+UPLOAD_HTML = '''<div style="text-align:center;padding:2rem 0">
+  <form method="POST" action="/upload" enctype="multipart/form-data" style="display:inline-block;text-align:left">
+    <label style="font-weight:bold;display:block;margin-bottom:8px">
+      Carica i tuoi dati
+    </label>
+    <input type="file" name="data_file" accept=".zip,application/zip,.json,application/json" multiple
+           style="margin-bottom:8px;display:block">
+    <button type="submit" class="btn btn-green">Carica</button>
+    <button type="submit" name="action" value="clear" class="btn btn-red"
+            onclick="return confirm('Cancellare tutti i dati in memoria?')">Cancella dati in memoria</button>
+  </form>
+  <p style="margin-top:1rem;color:#888;font-size:.85rem">
+    Carica un file <strong>.zip</strong> con tutti i JSON della cartella Dati_Dieta,
+    oppure carica uno o più file <strong>.json</strong> singolarmente.
+  </p>
+</div>'''
+
+@app.route('/upload', methods=['POST'])
+def upload_data():
+    action = flask.request.form.get('action', '')
+    if action == 'clear':
+        _mem_data.clear()
+        flask.flash("Dati rimossi dalla memoria.", "info")
+        return flask.redirect('/')
+
+    files = flask.request.files.getlist('data_file')
+    if not files or files[0].filename == '':
+        flask.flash("Nessun file selezionato.", "error")
+        return flask.redirect('/')
+
+    loaded = 0
+    for f in files:
+        if f.filename.endswith('.zip'):
+            import zipfile
+            try:
+                with zipfile.ZipFile(f) as zf:
+                    for name in zf.namelist():
+                        basename = os.path.basename(name)
+                        if basename in FILENAME_TO_KEY:
+                            key = FILENAME_TO_KEY[basename]
+                            _mem_data[key] = json.load(zf.open(name))
+                            loaded += 1
+            except zipfile.BadZipFile:
+                flask.flash(f"File {f.filename} non è uno zip valido.", "error")
+        elif f.filename.endswith('.json'):
+            basename = os.path.basename(f.filename)
+            if basename in FILENAME_TO_KEY:
+                key = FILENAME_TO_KEY[basename]
+                try:
+                    _mem_data[key] = json.load(f)
+                    loaded += 1
+                except json.JSONDecodeError:
+                    flask.flash(f"File {f.filename} non è un JSON valido.", "error")
+            else:
+                flask.flash(f"File {f.filename} non riconosciuto. Ignorato.", "warning")
+        else:
+            flask.flash(f"File {f.filename}: formato non supportato (solo .zip o .json).", "warning")
+
+    if loaded:
+        flask.flash(f"{loaded} file caricati con successo in memoria!", "success")
     return flask.redirect('/')
 
-@app.route('/enter_code', methods=['POST'])
-def enter_code():
-    code = flask.request.form.get('access_code', '').strip()
-    if not code:
-        flask.flash("Inserisci il codice di accesso!", "error")
-        return flask.redirect(flask.request.referrer or '/')
-    hashed = _hash_code(code)
-    flask.session['user_id'] = hashed
-    flask.session['code_set'] = True
-    flask.flash("Accesso effettuato! I tuoi dati sono stati ripristinati.", "success")
-    return flask.redirect('/')
-
-@app.route('/clear_code', methods=['POST'])
-def clear_code():
-    flask.session.clear()
-    flask.flash("Sessione terminata. Inserisci il tuo codice per rientrare.", "info")
-    return flask.redirect('/')
+@app.route('/download')
+def download_data():
+    import zipfile
+    buf = BytesIO()
+    count = 0
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for key, filename in KEY_TO_FILENAME.items():
+            if key in _mem_data:
+                zf.writestr(filename, json.dumps(_mem_data[key], indent=4, ensure_ascii=False))
+                count += 1
+    buf.seek(0)
+    if count == 0:
+        flask.flash("Nessun dato da scaricare.", "info")
+        return flask.redirect('/')
+    flask.flash(f"Scaricati {count} file (Dati_Dieta.zip).", "info")
+    return flask.Response(
+        buf.getvalue(),
+        mimetype='application/zip',
+        headers={'Content-Disposition': 'attachment; filename="Dati_Dieta.zip"'}
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
