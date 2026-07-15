@@ -8,8 +8,13 @@
     </form>
     <form method="POST" action="/record_calories" class="flex items-center gap-10">
         <label class="font-bold" style="min-width:140px">Registra Calorie (kcal):</label>
-        <input type="text" name="calories" placeholder="es. 2000" style="width:120px" required>
+        <input type="text" name="calories" id="calInput" placeholder="es. 2000" style="width:120px" required>
         <button type="submit" class="btn btn-blue">Registra</button>
+        {% if calculated_kcal > 0 %}
+            <button type="button" class="btn btn-purple" onclick="document.getElementById('calInput').value='{{ calculated_kcal }}'">
+                Usa {{ calculated_kcal }} kcal dal diario
+            </button>
+        {% endif %}
     </form>
 </div>
 

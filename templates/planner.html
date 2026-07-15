@@ -18,8 +18,21 @@
                 {% for dk in date_keys %}
                     {% set d_key = dk.key %}
                     {% set meal_name = plan_data.get(d_key, {}).get(cat, '-') if plan_data.get(d_key) else '-' %}
-                    <td class="clickable" onclick="openAssign('{{ d_key }}', '{{ cat }}')">
-                        {{ _format_meal_name(meal_name) if meal_name != '-' else '-' }}
+                    {% set is_today = (d_key == today_key) %}
+                    <td class="clickable" data-meal="{{ meal_name }}" data-cat="{{ cat }}" data-date="{{ d_key }}">
+                        <span class="meal-name">{{ _format_meal_name(meal_name) if meal_name != '-' else '-' }}</span>
+                        {% if meal_name and meal_name != '-' %}
+                            <span class="cell-actions">
+                                {% if is_today %}
+                                    <button type="button" class="btn-icon add-to-diary" title="Aggiungi al diario">&#128221;</button>
+                                {% endif %}
+                                {% if meal_name in templates %}
+                                    <button type="button" class="btn-icon edit-recipe" title="Modifica ricetta">&#9998;</button>
+                                {% else %}
+                                    <button type="button" class="btn-icon edit-recipe" title="Aggiungi ingredienti">&#9998;</button>
+                                {% endif %}
+                            </span>
+                        {% endif %}
                     </td>
                 {% endfor %}
             </tr>
@@ -70,6 +83,13 @@
                     <div class="hint" style="padding:10px">Nessun pasto rapido salvato. Aggiungine uno dalla scheda <strong>Storico Pasti</strong>.</div>
                 {% endif %}
             </div>
+            <div style="border-top:1px solid #252529;padding:8px 0;margin-bottom:8px">
+                <label class="label-muted" style="font-size:9pt">Oppure inserisci un nuovo pasto:</label>
+                <div style="margin-top:4px">
+                    <input type="text" name="meal_name_manual" placeholder="Nome pasto..." style="width:100%;padding:6px 10px;font-size:9pt;margin-bottom:4px">
+                    <button type="submit" class="btn btn-green" style="padding:6px 14px;font-size:9pt">Inserisci</button>
+                </div>
+            </div>
             <button type="button" class="btn btn-red w-full" onclick="closeAssign()">Annulla</button>
         </form>
     </div>
@@ -99,10 +119,47 @@
     </div>
 </div>
 
+<!-- Edit Template Modal -->
+<div id="editTemplateModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="width:420px;margin:auto;">
+        <div class="card-title">Modifica Pasto Rapido</div>
+        <form id="editTemplateForm" method="POST" action="/edit_meal_template">
+            <input type="hidden" name="old_name" id="editOldName">
+            <div class="mb-10">
+                <label class="label">Nome:</label>
+                <input type="text" name="new_name" id="editNewName" required style="width:100%">
+            </div>
+            <div class="mb-10">
+                <label class="label">Ingredienti:</label>
+                <textarea name="ingredients_text" id="editIngredientsText" rows="3" style="width:100%;background:#252529;color:#fff;border:1px solid #3f3f46;padding:8px;font-family:monospace;font-size:9pt" placeholder="pasta, 2; pollo, 1.5; pomodoro, 1"></textarea>
+            </div>
+            <div class="mb-10">
+                <label class="label">Categoria:</label>
+                <select name="category" id="editCategory" style="width:100%">
+                    <option value="">-- Nessuna --</option>
+                    <option value="Colazione">Colazione</option>
+                    <option value="Pranzo">Pranzo</option>
+                    <option value="Cena">Cena</option>
+                    <option value="Merenda">Merenda</option>
+                </select>
+            </div>
+            <div class="flex gap-10">
+                <button type="submit" class="btn btn-green w-full">Salva modifiche</button>
+                <button type="button" class="btn btn-red" onclick="closeEditTemplate()">Annulla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 let swapMode = false;
-let swapStep = 0; // 0=inactive, 1=select first, 2=select second
+let swapStep = 0;
 let swapSource = null;
+
+const templates = {{ templates | tojson | safe }};
+const porzioniData = {{ porzioni | tojson | safe }};
+const dateKeys = {{ date_keys | map(attribute='key') | list | tojson | safe }};
+const todayKey = {{ today_key | tojson | safe }};
 
 function openAssign(date, cat) {
     if (swapMode) {
@@ -127,11 +184,6 @@ function openAssign(date, cat) {
     document.getElementById('assignModal').style.display = 'flex';
 }
 
-function selectMeal(name) {
-    document.getElementById('selectedMeal').value = name;
-    document.querySelector('#assignModal form').submit();
-}
-
 function closeAssign() {
     document.getElementById('assignModal').style.display = 'none';
 }
@@ -149,43 +201,121 @@ function startSwap() {
     document.getElementById('swapBtn').textContent = 'Seleziona primo pasto...';
 }
 
-// Ingredient display on click
-const planData = {{ plan_data | tojson | safe }};
-const templates = {{ templates | tojson | safe }};
-const porzioni = {{ porzioni | tojson | safe }};
+function openEditTemplate(mealName) {
+    const data = templates[mealName];
+    document.getElementById('editOldName').value = mealName;
+    document.getElementById('editNewName').value = mealName;
+    document.getElementById('editCategory').value = (data && data.category) || '';
+    if (data) {
+        const ingredients = data.ingredients || data;
+        if (Array.isArray(ingredients) && ingredients.length > 0) {
+            document.getElementById('editIngredientsText').value = ingredients
+                .map(i => i[0] + ', ' + i[1]).join('; ');
+        } else {
+            document.getElementById('editIngredientsText').value = '';
+        }
+    } else {
+        document.getElementById('editIngredientsText').value = '';
+    }
+    document.getElementById('editTemplateModal').style.display = 'flex';
+}
 
+function closeEditTemplate() {
+    document.getElementById('editTemplateModal').style.display = 'none';
+}
+
+document.getElementById('editTemplateModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditTemplate();
+});
+
+// Single-click: show ingredients
+// Double-click: open assign modal
 document.querySelectorAll('.treeview tbody td.clickable').forEach(td => {
+    let clickTimer = null;
+
     td.addEventListener('click', function(e) {
         if (swapMode) return;
-        const row = this.parentElement;
-        const cat = row.cells[0].textContent.trim();
-        const colIdx = Array.from(row.cells).indexOf(this);
-        if (colIdx < 1) return;
-        const dateKey = {{ date_keys | map(attribute='key') | list | tojson | safe }}[colIdx - 1];
-        const mealName = this.textContent.trim();
-        const info = document.getElementById('ingredientsInfo');
+        if (e.target.closest('button')) return;
 
-        if (mealName === '-' || mealName === '') {
-            info.textContent = 'Click su un pasto programmato per visualizzare gli ingredienti';
+        if (clickTimer) {
+            clearTimeout(clickTimer);
+            clickTimer = null;
             return;
         }
 
-        const mealData = templates[mealName];
-        if (!mealData) {
-            info.textContent = mealName + ' (Nessun dettaglio ingredienti nel database)';
-            return;
-        }
+        clickTimer = setTimeout(() => {
+            clickTimer = null;
+            showIngredients(this);
+        }, 250);
+    });
 
-        const ingredients = mealData.ingredients || mealData;
-        if (!Array.isArray(ingredients)) {
-            info.textContent = mealName + ' (Nessun dettaglio ingredienti nel database)';
-            return;
+    td.addEventListener('dblclick', function(e) {
+        if (swapMode) return;
+        if (clickTimer) {
+            clearTimeout(clickTimer);
+            clickTimer = null;
         }
+        const date = this.dataset.date;
+        const cat = this.dataset.cat;
+        openAssign(date, cat);
+    });
+});
 
-        const porzione = (porzioni[dateKey] && porzioni[dateKey][cat]) || 1;
-        let str = mealName + ' fatto con: ';
-        str += ingredients.map(i => (i[1] * porzione).toFixed(2) + ' hg di ' + i[0]).join(', ');
-        info.textContent = str;
+function showIngredients(td) {
+    const mealName = td.dataset.meal;
+    const cat = td.dataset.cat;
+    const dateKey = td.dataset.date;
+    const info = document.getElementById('ingredientsInfo');
+
+    if (mealName === '-' || mealName === '') {
+        info.textContent = 'Doppio click per pianificare un pasto. Click su un pasto programmato per vedere gli ingredienti.';
+        return;
+    }
+
+    const mealData = templates[mealName];
+    if (!mealData) {
+        info.textContent = mealName + ' (Nessun dettaglio ingredienti nel database. Usa ✏️ per aggiungerli.)';
+        return;
+    }
+
+    const ingredients = mealData.ingredients || mealData;
+    if (!Array.isArray(ingredients) || ingredients.length === 0) {
+        info.textContent = mealName + ' (Nessun ingrediente registrato)';
+        return;
+    }
+
+    const porzione = (porzioniData[dateKey] && porzioniData[dateKey][cat]) || 1;
+    let str = mealName + ' fatto con: ';
+    str += ingredients.map(i => (i[1] * porzione).toFixed(2) + ' hg di ' + i[0]).join(', ');
+    info.textContent = str;
+}
+
+// 📋 button: add to diary
+document.querySelectorAll('.add-to-diary').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const td = this.closest('td');
+        const mealName = td.dataset.meal;
+        const date = td.dataset.date;
+        const cat = td.dataset.cat;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/add_plan_to_diary';
+        form.innerHTML = '<input name="meal_name" value="' + mealName + '">' +
+            '<input name="date" value="' + date + '">' +
+            '<input name="category" value="' + cat + '">';
+        document.body.appendChild(form);
+        form.submit();
+    });
+});
+
+// ✏️ button: edit recipe
+document.querySelectorAll('.edit-recipe').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const td = this.closest('td');
+        const mealName = td.dataset.meal;
+        openEditTemplate(mealName);
     });
 });
 </script>

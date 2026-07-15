@@ -135,9 +135,17 @@ def main_screen():
     if today_plan is None:
         today_plan = {c: '-' for c in MEAL_CATEGORIES}
 
+    # Auto-calculate calories from today's eaten items
+    calculated_kcal = 0
+    nvalues = data['nvalues']
+    for food_name, qty in data['today_eaten']:
+        info = nvalues.get(food_name, {})
+        calculated_kcal += info.get('kcal', 0) * qty
+
     stats_data = compute_stats(data)
     return flask.render_template('main.html', active='main', data=data,
-                                 today_plan=today_plan, stats=stats_data)
+                                 today_plan=today_plan, stats=stats_data,
+                                 calculated_kcal=round(calculated_kcal, 1))
 
 @app.route('/record_weight', methods=['POST'])
 def record_weight():
@@ -350,17 +358,23 @@ def planner_screen():
         if hi is not None: parts.append(f"\u2264{hi:.0f}")
         active_parts.append(f"{lbl}: {', '.join(parts) if parts else 'attivo'}")
 
+    today_key = datetime.now().strftime("%Y-%m-%d")
     return flask.render_template('planner.html', active='planner', data=data,
                                  plan_data=plan_data, templates=templates,
                                  porzioni=porzioni, date_keys=date_keys,
                                  constraints=constraints, active_parts=active_parts,
-                                 meal_categories=MEAL_CATEGORIES)
+                                 meal_categories=MEAL_CATEGORIES, today_key=today_key)
 
 @app.route('/assign_meal', methods=['POST'])
 def assign_meal():
     target_date = flask.request.form.get('date', '')
     category = flask.request.form.get('category', '')
     meal_name = flask.request.form.get('meal_name', '')
+    manual_name = flask.request.form.get('meal_name_manual', '').strip()
+
+    # Use manual name if provided (overrides template selection)
+    if manual_name:
+        meal_name = manual_name
 
     plan_data = look_for(FILES['plan'], {})
     if target_date not in plan_data or plan_data[target_date] is None:
@@ -368,10 +382,114 @@ def assign_meal():
 
     if meal_name == "[ Svuota Cella ]":
         plan_data[target_date][category] = '-'
-    else:
+    elif meal_name:
         plan_data[target_date][category] = meal_name
 
     record(FILES['plan'], plan_data)
+    return flask.redirect('/planner')
+
+def _parse_ingredients(raw):
+    """Parse ingredient string 'cibo1, qty; cibo2, qty' into [[name, qty], ...]."""
+    result = []
+    for part in raw.split(';'):
+        part = part.strip()
+        if not part:
+            continue
+        if ',' in part:
+            name, qty_str = part.rsplit(',', 1)
+            name = name.strip()
+            try:
+                qty = float(qty_str.strip().replace(',', '.'))
+                if name and qty > 0:
+                    result.append([name, qty])
+            except ValueError:
+                continue
+    return result
+
+@app.route('/add_plan_to_diary', methods=['POST'])
+def add_plan_to_diary():
+    meal_name = flask.request.form.get('meal_name', '').strip()
+    target_date = flask.request.form.get('date', '')
+    category = flask.request.form.get('category', '')
+    inline_ingredients = flask.request.form.get('inline_ingredients', '').strip()
+
+    if not meal_name or not target_date:
+        flask.flash("Dati mancanti.", "error")
+        return flask.redirect('/planner')
+
+    templates = look_for(FILES['pasti'], {})
+    meal_data = templates.get(meal_name)
+
+    # If no template, check for inline ingredients
+    if meal_data is None:
+        if inline_ingredients:
+            ingredients = _parse_ingredients(inline_ingredients)
+            if not ingredients:
+                flask.flash("Nessun ingrediente valido inserito.", "error")
+                return flask.redirect('/planner')
+        else:
+            flask.flash(f"Pasto '{meal_name}' non ha ingredienti. Usa il modifica template per aggiungerli.", "error")
+            return flask.redirect('/planner')
+    else:
+        ingredients = _get_meal_ingredients(meal_data)
+        # Check for porzione multiplier only for template meals
+        porzioni = look_for(FILES['porzioni'], {})
+        porzione = 1.0
+        if target_date in porzioni and category in porzioni.get(target_date, {}):
+            porzione = porzioni[target_date][category]
+        ingredients = [[food, round(qty * porzione, 2)] for food, qty in ingredients]
+
+    if not ingredients:
+        flask.flash(f"Il pasto '{meal_name}' non ha ingredienti.", "warning")
+        return flask.redirect('/planner')
+
+    # Add to eaten_list for this date
+    all_eaten = look_for(FILES['eaten'], {})
+    if target_date not in all_eaten:
+        all_eaten[target_date] = []
+    if not isinstance(all_eaten[target_date], list):
+        all_eaten[target_date] = []
+    all_eaten[target_date].extend(ingredients)
+    record(FILES['eaten'], all_eaten)
+
+    flask.flash(f"'{meal_name}' aggiunto al diario del {target_date} ({len(ingredients)} ingredienti).", "success")
+    return flask.redirect('/planner')
+
+@app.route('/edit_meal_template', methods=['POST'])
+def edit_meal_template():
+    old_name = flask.request.form.get('old_name', '').strip()
+    new_name = flask.request.form.get('new_name', '').strip()
+    ingredients_text = flask.request.form.get('ingredients_text', '').strip()
+    category = flask.request.form.get('category', '')
+
+    save_name = new_name if new_name else old_name
+    if not save_name:
+        flask.flash("Nome pasto mancante.", "error")
+        return flask.redirect('/planner')
+
+    ingredients = _parse_ingredients(ingredients_text) if ingredients_text else []
+
+    templates = look_for(FILES['pasti'], {})
+
+    # Remove old entry if it exists and name changed
+    if old_name and old_name in templates and old_name != save_name:
+        del templates[old_name]
+
+    if ingredients:
+        templates[save_name] = {"ingredients": ingredients, "category": category}
+    elif save_name in templates:
+        # Keep existing data, just update category
+        existing = templates[save_name]
+        if isinstance(existing, dict):
+            existing["category"] = category
+        else:
+            templates[save_name] = {"ingredients": existing if isinstance(existing, list) else [], "category": category}
+    else:
+        # New meal name without ingredients: just create empty
+        templates[save_name] = {"ingredients": [], "category": category}
+
+    record(FILES['pasti'], templates)
+    flask.flash(f"Pasto '{save_name}' salvato!", "success")
     return flask.redirect('/planner')
 
 @app.route('/swap_meals', methods=['POST'])
@@ -432,6 +550,23 @@ def ottimizza_piano_func():
 
     plan_data = look_for(FILES['plan'], {})
     constraints = look_for(FILES['constraints'], {})
+
+    # Check that all planned meals have template data
+    untemplated = []
+    for i in range(5):
+        date_obj = datetime.now() + timedelta(days=i)
+        d_key = date_obj.strftime("%Y-%m-%d")
+        day_plan = plan_data.get(d_key, {})
+        if day_plan:
+            for cat in MEAL_CATEGORIES:
+                meal = day_plan.get(cat, "-")
+                if meal and meal != "-" and meal not in templates:
+                    untemplated.append(f"{meal} ({d_key}, {cat})")
+    if untemplated:
+        flask.flash(
+            "Pasti nel piano senza template (usa il modifica per aggiungere ingredienti): "
+            + "; ".join(untemplated), "error")
+        return False
 
     # Exclude already assigned meals
     assigned_meals = set()
